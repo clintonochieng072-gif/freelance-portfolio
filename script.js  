@@ -1,0 +1,2 @@
+console.log("Script is working!");
+alert("Hello! Script loaded successfully!");

@@ -1,0 +1,303 @@
+/* GENERAL APP STYLING */
+.App {
+  text-align: center;
+  font-family: "Inter", sans-serif;
+  background: #f4f5f7;
+  min-height: 100vh;
+  color: #222;
+  padding-bottom: 50px;
+}
+
+/* SECTION STYLING */
+.section {
+  margin: 2rem auto;
+  padding: 1.5rem;
+  max-width: 900px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  text-align: left;
+}
+
+.section h2 {
+  color: #333;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section button {
+  cursor: pointer;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 6px;
+  background: #007bff;
+  color: white;
+  transition: all 0.2s;
+}
+
+.section button:hover {
+  background: #0056b3;
+}
+
+/* CONTACTS / PROJECTS / SKILLS */
+.editable-item {
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editable-item input {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  flex: 1;
+}
+
+.next-btn,
+.ok-btn,
+.cancel-btn,
+.save-btn {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 4px;
+}
+
+.next-btn {
+  background: #007bff;
+  color: white;
+}
+.ok-btn {
+  background: #28a745;
+  color: white;
+}
+.cancel-btn {
+  background: #dc3545;
+  color: white;
+}
+.save-btn {
+  background: #333;
+  color: white;
+  margin-top: 10px;
+}
+
+.next-btn:hover {
+  background: #0056b3;
+}
+.ok-btn:hover {
+  background: #1f8f3e;
+}
+.cancel-btn:hover {
+  background: #a71d2a;
+}
+.save-btn:hover {
+  background: #111;
+}
+
+/* SKILLS GRID */
+.skills-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.skill-tag {
+  background: #007bff;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+/* PROJECT CARDS */
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-card {
+  background: #f9f9f9;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.project-card h3 {
+  margin: 0 0 6px 0;
+  color: #222;
+}
+
+.project-card p {
+  margin: 0 0 8px 0;
+}
+
+/* ✅ PROJECT LINKS - VERTICAL LAYOUT */
+.project-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.project-link {
+  display: inline-block;
+  padding: 8px 12px;
+  background: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  text-align: center;
+  transition: all 0.3s;
+  font-size: 0.9em;
+}
+
+.project-link:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+/* ✅ TESTIMONIALS STYLING */
+.testimonials-list {
+  display: grid;
+  gap: 20px;
+  margin-top: 15px;
+}
+
+.testimonial-card {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+/* ✅ TESTIMONIAL WITH PROFILE PICTURE */
+.testimonial-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.testimonial-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #007bff;
+}
+
+.testimonial-info {
+  flex: 1;
+}
+
+.testimonial-info strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.testimonial-info span {
+  font-size: 0.9em;
+  color: #666;
+}
+
+.testimonial-comment {
+  font-style: italic;
+  margin-bottom: 10px;
+  line-height: 1.5;
+  color: #444;
+}
+
+.testimonial-author {
+  color: #666;
+  font-size: 0.9em;
+}
+
+/* ADMIN CONTAINER */
+.admin-container {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 1rem;
+}
+
+/* ✅ DARK MODE SUPPORT */
+.dark-mode .App {
+  background: #1a202c;
+  color: #e2e8f0;
+}
+
+.dark-mode .section {
+  background: #2d3748;
+  color: #e2e8f0;
+}
+
+.dark-mode .section h2 {
+  color: #e2e8f0;
+}
+
+.dark-mode .project-card {
+  background: #2d3748;
+  color: #e2e8f0;
+}
+
+.dark-mode .project-card h3 {
+  color: #e2e8f0;
+}
+
+.dark-mode .project-link {
+  background: #63b3ed;
+}
+
+.dark-mode .project-link:hover {
+  background: #4299e1;
+}
+
+.dark-mode .testimonial-card {
+  background: #2d3748;
+  border-left-color: #63b3ed;
+}
+
+.dark-mode .testimonial-avatar {
+  border-color: #63b3ed;
+}
+
+.dark-mode .testimonial-info span {
+  color: #cbd5e0;
+}
+
+.dark-mode .testimonial-comment {
+  color: #e2e8f0;
+}
+
+.dark-mode .testimonial-author {
+  color: #cbd5e0;
+}
+
+.dark-mode .skill-tag {
+  background: #63b3ed;
+}
+
+/* CONTACTS LIST */
+.contacts-list {
+  list-style: none;
+  padding: 0;
+}
+
+.contacts-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.contacts-list li:last-child {
+  border-bottom: none;
+}
+
+.dark-mode .contacts-list li {
+  border-bottom: 1px solid #4a5568;
+}
