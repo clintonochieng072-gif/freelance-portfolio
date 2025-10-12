@@ -8,7 +8,7 @@ const { Server } = require("socket.io");
 
 const authRoutes = require("./routes/auth");
 const portfolioRoutes = require("./routes/portfolio");
-const adminRoutes = require("./routes/admin"); // ✅ NEW
+const adminRoutes = require("./routes/admin");
 
 const app = express();
 const server = http.createServer(app);
@@ -30,10 +30,41 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// Routes
+// Routes - MUST BE ADDED!
 app.use("/api/auth", authRoutes);
 app.use("/api/portfolio", portfolioRoutes);
-app.use("/api/admin", adminRoutes); // ✅ NEW
+app.use("/api/admin", adminRoutes);
+
+// Root route for health check
+app.get("/", (req, res) => {
+  res.json({
+    status: "OK",
+    message: "Portfolio SaaS Backend is running",
+    version: "1.0.0",
+  });
+});
+
+// API root route
+app.get("/api", (req, res) => {
+  res.json({
+    status: "OK",
+    message: "Portfolio SaaS API is running",
+    endpoints: {
+      auth: "/api/auth",
+      portfolio: "/api/portfolio",
+      admin: "/api/admin",
+    },
+  });
+});
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "OK",
+    message: "Portfolio API is working",
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Socket.io
 const io = new Server(server, {
@@ -51,11 +82,13 @@ io.on("connection", (socket) => {
 
   socket.on("joinPortfolioRoom", (username) => {
     socket.join(username);
+    console.log(`Socket ${socket.id} joined room: ${username}`);
   });
 
   socket.on("portfolioUpdated", (data) => {
     const username = data.username;
     io.to(username).emit("portfolioUpdated", data);
+    console.log(`Portfolio updated for: ${username}`);
   });
 
   socket.on("disconnect", () => {
@@ -76,4 +109,9 @@ mongoose
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Multi-tenant portfolio SaaS running on port ${PORT}`);
+  console.log(`Available routes:`);
+  console.log(`- GET  /api/health`);
+  console.log(`- GET  /api/auth/*`);
+  console.log(`- GET  /api/portfolio/*`);
+  console.log(`- GET  /api/admin/*`);
 });
