@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import Cookies from "js-cookie";
+import { useGlobalContext } from "../context/GlobalContext";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
@@ -10,6 +10,7 @@ function LoginPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useGlobalContext();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -25,7 +26,8 @@ function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        Cookies.set("token", data.token, { expires: 7 });
+        // Use context to login (which also sets cookie)
+        login(data.user, data.token);
         setMessage("✅ Login successful!");
         setTimeout(() => {
           navigate("/admin/dashboard");
@@ -64,7 +66,6 @@ function LoginPage() {
           </button>
         </form>
 
-        {/* ✅ ADDED FORGOT PASSWORD LINK */}
         <div className="auth-links">
           <Link to="/forgot-password">Forgot your password?</Link>
         </div>

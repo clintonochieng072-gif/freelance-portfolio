@@ -15,6 +15,7 @@ import RegisterPage from "./components/RegisterPage";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPassword from "./components/ResetPassword";
 import NotFoundPage from "./pages/NotFoundPage";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   const [darkMode, setDarkMode] = useState(false);
@@ -33,9 +34,23 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/portfolio/:username" element={<HomePage />} />
 
-            {/* Client Admin Routes */}
-            <Route path="/admin/dashboard" element={<ClientAdmin />} />
-            <Route path="/admin/:username" element={<AdminPage />} />
+            {/* Protected Admin Routes */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute>
+                  <ClientAdmin />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/:username"
+              element={
+                <ProtectedRoute>
+                  <AdminPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Fallback */}
             <Route path="*" element={<NotFoundPage />} />

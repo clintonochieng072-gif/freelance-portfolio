@@ -1,19 +1,55 @@
-// src/context/GlobalContext.js
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import Cookies from "js-cookie";
 
 const GlobalContext = createContext();
 
 export const GlobalProvider = ({ children }) => {
-  const [user, setUser] = useState(null); // { username, email, role }
-  const [token, setToken] = useState(null); // JWT token
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const [contacts, setContacts] = useState({});
   const [skills, setSkills] = useState([]);
   const [projects, setProjects] = useState([]);
 
+  // Check if user is logged in on app startup
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      const savedToken = Cookies.get("token");
+      if (savedToken) {
+        try {
+          // Verify token is still valid with backend
+          const API_URL =
+            process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+          const response = await fetch(`${API_URL}/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${savedToken}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+            setToken(savedToken);
+          } else {
+            // Token is invalid, clear it
+            Cookies.remove("token");
+          }
+        } catch (error) {
+          console.error("Auth check failed:", error);
+          Cookies.remove("token");
+        }
+      }
+      setLoading(false);
+    };
+
+    checkAuthStatus();
+  }, []);
+
   const login = (userData, jwtToken) => {
     setUser(userData);
     setToken(jwtToken);
+    Cookies.set("token", jwtToken, { expires: 7 });
   };
 
   const logout = () => {
@@ -22,6 +58,7 @@ export const GlobalProvider = ({ children }) => {
     setContacts({});
     setSkills([]);
     setProjects([]);
+    Cookies.remove("token");
   };
 
   return (
@@ -29,6 +66,7 @@ export const GlobalProvider = ({ children }) => {
       value={{
         user,
         token,
+        loading,
         login,
         logout,
         contacts,
@@ -44,4 +82,10 @@ export const GlobalProvider = ({ children }) => {
   );
 };
 
-export const useGlobalContext = () => useContext(GlobalContext);
+export const useGlobalContext = () => {
+  const context = useContext(GlobalContext);
+  if (!context) {
+    throw new Error("useGlobalContext must be used within a GlobalProvider");
+  }
+  return context;
+};

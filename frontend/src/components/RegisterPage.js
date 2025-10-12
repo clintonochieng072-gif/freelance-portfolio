@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import Cookies from "js-cookie";
+import { useGlobalContext } from "../context/GlobalContext";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
@@ -10,11 +10,12 @@ function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    displayName: ""
+    displayName: "",
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
+  const { login } = useGlobalContext();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -47,14 +48,15 @@ function RegisterPage() {
           username: formData.username,
           email: formData.email,
           password: formData.password,
-          displayName: formData.displayName || formData.username
+          displayName: formData.displayName || formData.username,
         }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        Cookies.set("token", data.token, { expires: 7 });
+        // Use context to login (which also sets cookie)
+        login(data.user, data.token);
         setMessage("✅ Registration successful! Redirecting...");
         setTimeout(() => {
           navigate(`/admin/dashboard`);
@@ -73,8 +75,10 @@ function RegisterPage() {
     <div className="login-container">
       <div className="auth-card">
         <h2>Create Your Portfolio</h2>
-        <p className="auth-subtitle">Start building your professional portfolio in minutes</p>
-        
+        <p className="auth-subtitle">
+          Start building your professional portfolio in minutes
+        </p>
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <input
@@ -85,7 +89,9 @@ function RegisterPage() {
               onChange={handleChange}
               required
             />
-            <small>yourportfolio.com/portfolio/{formData.username || 'username'}</small>
+            <small>
+              yourportfolio.com/portfolio/{formData.username || "username"}
+            </small>
           </div>
 
           <div className="form-group">
