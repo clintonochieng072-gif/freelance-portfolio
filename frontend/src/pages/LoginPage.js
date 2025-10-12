@@ -63,7 +63,14 @@ function LoginPage() {
             {loading ? "Signing In..." : "Sign In"}
           </button>
         </form>
+
+        {/* ✅ ADDED FORGOT PASSWORD LINK */}
+        <div className="auth-links">
+          <Link to="/forgot-password">Forgot your password?</Link>
+        </div>
+
         {message && <p className="auth-message">{message}</p>}
+
         <div className="auth-footer">
           Don't have an account? <Link to="/register">Create Portfolio</Link>
         </div>

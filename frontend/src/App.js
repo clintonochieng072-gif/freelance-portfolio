@@ -12,6 +12,8 @@ import AdminPage from "./components/AdminPage";
 import ClientAdmin from "./components/ClientAdmin";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./components/RegisterPage";
+import ForgotPassword from "./components/ForgotPassword";
+import ResetPassword from "./components/ResetPassword";
 import NotFoundPage from "./pages/NotFoundPage";
 
 function App() {
@@ -27,6 +29,8 @@ function App() {
             <Route path="/" element={<Navigate to="/register" replace />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/portfolio/:username" element={<HomePage />} />
 
             {/* Client Admin Routes */}

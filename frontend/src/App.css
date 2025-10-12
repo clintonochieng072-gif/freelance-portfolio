@@ -18,7 +18,50 @@
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
   text-align: left;
 }
+/* Forgot Password Styles */
+.auth-links {
+  text-align: center;
+  margin: 1rem 0;
+}
 
+.auth-links a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.auth-links a:hover {
+  text-decoration: underline;
+}
+
+.reset-link-container {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #28a745;
+}
+
+.reset-link-note {
+  font-size: 0.9em;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.reset-link a {
+  color: #28a745;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.reset-link a:hover {
+  text-decoration: underline;
+}
+
+.auth-message.success {
+  color: #28a745;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+}
 .section h2 {
   color: #333;
   margin-bottom: 1rem;
