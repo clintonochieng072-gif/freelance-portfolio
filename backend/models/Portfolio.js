@@ -1,4 +1,3 @@
-// models/Portfolio.js
 const mongoose = require("mongoose");
 
 const ProjectSchema = new mongoose.Schema({
@@ -15,12 +14,25 @@ const TestimonialSchema = new mongoose.Schema({
   comment: { type: String, default: "" },
   position: { type: String, default: "" },
   company: { type: String, default: "" },
-  profilePicture: { type: String, default: "" }, // ✅ ADD profile picture
+  profilePicture: { type: String, default: "" },
 });
 
 const PortfolioSchema = new mongoose.Schema(
   {
-    username: { type: String, required: true, unique: true },
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    displayName: { type: String, default: "" },
+    title: { type: String, default: "Freelance Portfolio" },
+    bio: { type: String, default: "" },
     contacts: {
       type: Object,
       default: {},
@@ -28,6 +40,12 @@ const PortfolioSchema = new mongoose.Schema(
     skills: { type: [String], default: [] },
     projects: { type: [ProjectSchema], default: [] },
     testimonials: { type: [TestimonialSchema], default: [] },
+    theme: {
+      type: String,
+      enum: ["light", "dark", "blue", "green"],
+      default: "light",
+    },
+    isPublished: { type: Boolean, default: true },
   },
   {
     timestamps: true,

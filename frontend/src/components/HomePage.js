@@ -1,135 +1,123 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import "../App.css";
 
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
-function HomePage({ username }) {
-  const [contacts, setContacts] = useState({});
-  const [skills, setSkills] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [testimonials, setTestimonials] = useState([]);
+function HomePage() {
+  const { username } = useParams();
+  const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const fetchPortfolio = useCallback(async () => {
+    if (!username) {
+      setError("No portfolio specified");
+      setLoading(false);
+      return;
+    }
+
     try {
-      console.log("Fetching portfolio for:", username);
       const res = await fetch(`${API_URL}/portfolio/${username}`);
 
       if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
+        throw new Error(`Portfolio not found`);
       }
 
       const data = await res.json();
-      console.log("Portfolio data received:", data);
-
-      // Filter out empty contact fields
-      const cleanContacts = {};
-      if (data.contacts) {
-        Object.keys(data.contacts).forEach((key) => {
-          if (data.contacts[key] && data.contacts[key].trim() !== "") {
-            cleanContacts[key] = data.contacts[key];
-          }
-        });
-      }
-
-      setContacts(cleanContacts);
-      setSkills(data.skills || []);
-      setProjects(data.projects || []);
-      setTestimonials(data.testimonials || []);
+      setPortfolio(data);
       setError("");
     } catch (err) {
       console.error("Error fetching portfolio:", err);
-      setError("Failed to load portfolio data");
+      setError("Portfolio not found or is private");
     } finally {
       setLoading(false);
     }
   }, [username]);
 
   useEffect(() => {
-    if (!username) {
-      setError("No username provided");
-      setLoading(false);
-      return;
-    }
-
     fetchPortfolio();
+
     const socket = io(SOCKET_URL);
     socket.emit("joinPortfolioRoom", username);
 
-    socket.on(
-      "portfolioUpdated",
-      ({ contacts, skills, projects, testimonials }) => {
-        console.log("Real-time update received");
-        if (contacts) {
-          const cleanContacts = {};
-          Object.keys(contacts).forEach((key) => {
-            if (contacts[key] && contacts[key].trim() !== "") {
-              cleanContacts[key] = contacts[key];
-            }
-          });
-          setContacts(cleanContacts);
-        }
-        if (skills) setSkills(skills);
-        if (projects) setProjects(projects);
-        if (testimonials) setTestimonials(testimonials);
+    socket.on("portfolioUpdated", ({ portfolio: updatedPortfolio }) => {
+      if (updatedPortfolio && updatedPortfolio.username === username) {
+        setPortfolio(updatedPortfolio);
       }
-    );
+    });
 
     return () => socket.disconnect();
   }, [username, fetchPortfolio]);
 
-  if (loading) return <p>Loading portfolio...</p>;
-  if (error) return <p>Error: {error}</p>;
+  if (loading)
+    return (
+      <div className="App">
+        <p>Loading portfolio...</p>
+      </div>
+    );
+  if (error)
+    return (
+      <div className="App">
+        <p>Error: {error}</p>
+      </div>
+    );
+  if (!portfolio)
+    return (
+      <div className="App">
+        <p>Portfolio not found</p>
+      </div>
+    );
 
   return (
-    <div className="App">
-      <h1>{username}'s Portfolio</h1>
+    <div className={`App ${portfolio.theme === "dark" ? "dark-mode" : ""}`}>
+      <header className="portfolio-header">
+        <h1>{portfolio.displayName || portfolio.username}'s Portfolio</h1>
+        {portfolio.title && (
+          <p className="portfolio-title">{portfolio.title}</p>
+        )}
+        {portfolio.bio && <p className="portfolio-bio">{portfolio.bio}</p>}
+      </header>
 
       {/* Contacts */}
-      <section className="section">
-        <h2>Contacts</h2>
-        {Object.keys(contacts).length > 0 ? (
+      {Object.keys(portfolio.contacts).length > 0 && (
+        <section className="section">
+          <h2>Contact Information</h2>
           <ul className="contacts-list">
-            {Object.entries(contacts).map(([key, value]) => (
+            {Object.entries(portfolio.contacts).map(([key, value]) => (
               <li key={key}>
                 <strong>{key}:</strong> {value}
               </li>
             ))}
           </ul>
-        ) : (
-          <p>No contacts added yet.</p>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* Skills */}
-      <section className="section">
-        <h2>Skills</h2>
-        {skills.length > 0 ? (
+      {portfolio.skills.length > 0 && (
+        <section className="section">
+          <h2>Skills & Expertise</h2>
           <div className="skills-grid">
-            {skills.map((skill, i) => (
+            {portfolio.skills.map((skill, i) => (
               <span key={i} className="skill-tag">
                 {skill}
               </span>
             ))}
           </div>
-        ) : (
-          <p>No skills added yet.</p>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* Projects */}
-      <section className="section">
-        <h2>Projects</h2>
-        {projects.length > 0 ? (
+      {portfolio.projects.length > 0 && (
+        <section className="section">
+          <h2>Projects</h2>
           <div className="projects-list">
-            {projects.map((p, i) => (
+            {portfolio.projects.map((p, i) => (
               <div key={i} className="project-card">
                 {p.name && <h3>{p.name}</h3>}
                 {p.description && <p>{p.description}</p>}
-                {/* ✅ UPDATE Project Links - Vertical Layout with Better Labels */}
                 <div className="project-links">
                   {p.github && (
                     <a
@@ -155,17 +143,15 @@ function HomePage({ username }) {
               </div>
             ))}
           </div>
-        ) : (
-          <p>No projects added yet.</p>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* ✅ UPDATE Testimonials with Profile Pictures */}
-      {testimonials.length > 0 && (
+      {/* Testimonials */}
+      {portfolio.testimonials.length > 0 && (
         <section className="section">
-          <h2>Testimonials</h2>
+          <h2>Client Testimonials</h2>
           <div className="testimonials-list">
-            {testimonials.map((t, i) => (
+            {portfolio.testimonials.map((t, i) => (
               <div key={i} className="testimonial-card">
                 <div className="testimonial-header">
                   {t.profilePicture && (
@@ -187,6 +173,10 @@ function HomePage({ username }) {
           </div>
         </section>
       )}
+
+      <footer className="portfolio-footer">
+        <p>Powered by PortfolioPro</p>
+      </footer>
     </div>
   );
 }

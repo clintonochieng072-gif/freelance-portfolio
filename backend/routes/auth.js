@@ -1,38 +1,126 @@
-// routes/auth.js
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const User = require("../models/User"); // assuming you have a User model
-const bcrypt = require("bcryptjs");
+const User = require("../models/User");
+const Portfolio = require("../models/Portfolio");
 
-router.post("/login", async (req, res) => {
-  const { username, password } = req.body;
-
+// Client Registration
+router.post("/register", async (req, res) => {
   try {
-    const user = await User.findOne({ username });
-    if (!user) return res.status(404).json({ error: "User not found" });
+    const { username, email, password, displayName } = req.body;
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
+    // Check if user exists
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }],
     });
 
-    res.cookie("token", token, {
-      httpOnly: false,
-      sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    if (existingUser) {
+      return res.status(400).json({
+        error: "User with this email or username already exists",
+      });
+    }
+
+    // Create user
+    const user = new User({ username, email, password });
+    await user.save();
+
+    // Create default portfolio
+    const portfolio = new Portfolio({
+      username,
+      userId: user._id,
+      displayName: displayName || username,
+      contacts: {},
+      skills: [],
+      projects: [],
+      testimonials: [],
     });
+    await portfolio.save();
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user._id, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({
+      message: "Registration successful",
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        plan: user.plan,
+      },
+    });
+  } catch (err) {
+    console.error("Registration error:", err);
+    res.status(500).json({ error: "Registration failed" });
+  }
+});
+
+// Client Login
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Check password
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Generate token
+    const token = jwt.sign(
+      { userId: user._id, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     res.json({
       message: "Login successful",
-      username: user.username,
       token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        plan: user.plan,
+      },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Login failed" });
+  }
+});
+
+// Get current user
+router.get("/me", async (req, res) => {
+  try {
+    const token = req.cookies?.token || req.headers["authorization"];
+    if (!token) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ user });
+  } catch (err) {
+    res.status(401).json({ error: "Invalid token" });
   }
 });
 

@@ -8,12 +8,17 @@ const { Server } = require("socket.io");
 
 const authRoutes = require("./routes/auth");
 const portfolioRoutes = require("./routes/portfolio");
+const adminRoutes = require("./routes/admin"); // ✅ NEW
 
 const app = express();
 const server = http.createServer(app);
 
-// ---- CORS setup ----
-const allowedOrigins = ["http://localhost:5173", "http://localhost:3000"];
+// CORS setup
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://portfolio-frontend-clinton.onrender.com",
+];
 app.use(
   cors({
     origin: allowedOrigins,
@@ -21,15 +26,16 @@ app.use(
   })
 );
 
-// ---- Middlewares ----
+// Middlewares
 app.use(express.json());
 app.use(cookieParser());
 
-// ---- Routes ----
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/portfolio", portfolioRoutes);
+app.use("/api/admin", adminRoutes); // ✅ NEW
 
-// ---- Socket.io ----
+// Socket.io
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
@@ -38,7 +44,6 @@ const io = new Server(server, {
   },
 });
 
-// ✅ FIX: Make io instance accessible to routes
 app.set("io", io);
 
 io.on("connection", (socket) => {
@@ -58,7 +63,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// ---- MongoDB connection ----
+// MongoDB connection
 mongoose
   .connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
@@ -67,8 +72,8 @@ mongoose
   .then(() => console.log("MongoDB Atlas connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// ---- Start server ----
+// Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Multi-tenant portfolio SaaS running on port ${PORT}`);
 });

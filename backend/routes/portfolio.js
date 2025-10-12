@@ -1,24 +1,19 @@
-// routes/portfolio.js
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const Portfolio = require("../models/Portfolio");
 
-// GET portfolio by username
+// Get portfolio by username (Public route)
 router.get("/:username", async (req, res) => {
   try {
     const { username } = req.params;
-    let portfolio = await Portfolio.findOne({ username });
+    const portfolio = await Portfolio.findOne({
+      username: username.toLowerCase(),
+      isPublished: true,
+    });
 
     if (!portfolio) {
-      portfolio = new Portfolio({
-        username,
-        contacts: {},
-        skills: [],
-        projects: [],
-        testimonials: [],
-      });
-      await portfolio.save();
+      return res.status(404).json({ error: "Portfolio not found" });
     }
 
     res.json(portfolio);
@@ -28,82 +23,70 @@ router.get("/:username", async (req, res) => {
   }
 });
 
-// Update portfolio (admin only)
-router.put("/update/:username", authMiddleware, async (req, res) => {
-  const { username } = req.params;
-  const { contacts, skills, projects, testimonials } = req.body;
-
+// Get client's own portfolio (Protected)
+router.get("/me/portfolio", authMiddleware, async (req, res) => {
   try {
-    let portfolio = await Portfolio.findOne({ username });
+    const portfolio = await Portfolio.findOne({ username: req.user.username });
 
     if (!portfolio) {
-      portfolio = new Portfolio({
-        username,
-        contacts: {},
-        skills: [],
-        projects: [],
-        testimonials: [],
-      });
+      return res.status(404).json({ error: "Portfolio not found" });
     }
 
-    // Update only provided fields
-    if (contacts) {
-      const cleanContacts = {};
-      Object.keys(contacts).forEach((key) => {
-        if (contacts[key] && contacts[key].trim() !== "") {
-          cleanContacts[key] = contacts[key];
-        }
-      });
-      portfolio.contacts = cleanContacts;
+    res.json(portfolio);
+  } catch (err) {
+    console.error("Error fetching portfolio:", err);
+    res.status(500).json({ error: "Error fetching portfolio" });
+  }
+});
+
+// Update portfolio (Client's own portfolio only)
+router.put("/update", authMiddleware, async (req, res) => {
+  try {
+    const {
+      contacts,
+      skills,
+      projects,
+      testimonials,
+      displayName,
+      title,
+      bio,
+      theme,
+    } = req.body;
+
+    let portfolio = await Portfolio.findOne({ username: req.user.username });
+
+    if (!portfolio) {
+      return res.status(404).json({ error: "Portfolio not found" });
     }
 
-    if (skills) {
-      portfolio.skills = skills.filter((s) => s && s.trim() !== "");
-    }
-
-    if (projects) {
-      portfolio.projects = projects.map((p, index) => ({
-        id: p.id || Date.now() + index,
-        name: p.name || "",
-        description: p.description || "",
-        github: p.github || "",
-        liveDemo: p.liveDemo || "",
-      }));
-    }
-
-    // ✅ UPDATE Testimonials with profile picture
-    if (testimonials) {
-      portfolio.testimonials = testimonials.map((t, index) => ({
-        id: t.id || Date.now() + index,
-        clientName: t.clientName || "",
-        comment: t.comment || "",
-        position: t.position || "",
-        company: t.company || "",
-        profilePicture: t.profilePicture || "", // ✅ ADD profile picture
-      }));
-    }
+    // Update portfolio fields
+    if (contacts) portfolio.contacts = contacts;
+    if (skills) portfolio.skills = skills.filter((s) => s && s.trim() !== "");
+    if (projects) portfolio.projects = projects;
+    if (testimonials) portfolio.testimonials = testimonials;
+    if (displayName) portfolio.displayName = displayName;
+    if (title) portfolio.title = title;
+    if (bio) portfolio.bio = bio;
+    if (theme) portfolio.theme = theme;
 
     const savedPortfolio = await portfolio.save();
 
-    // Emit socket event immediately for real-time updates
+    // Emit socket event for real-time updates
     const io = req.app.get("io");
     if (io) {
-      io.to(username).emit("portfolioUpdated", {
-        username: username,
-        contacts: savedPortfolio.contacts,
-        skills: savedPortfolio.skills,
-        projects: savedPortfolio.projects,
-        testimonials: savedPortfolio.testimonials,
+      io.to(req.user.username).emit("portfolioUpdated", {
+        username: req.user.username,
+        portfolio: savedPortfolio,
       });
     }
 
     res.json({
-      message: "Saved",
+      message: "Portfolio updated successfully",
       portfolio: savedPortfolio,
     });
   } catch (err) {
     console.error("Error updating portfolio:", err);
-    res.status(500).json({ error: "Error updating portfolio: " + err.message });
+    res.status(500).json({ error: "Error updating portfolio" });
   }
 });
 

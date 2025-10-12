@@ -1,43 +1,42 @@
-import React, { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
+import React, { useState } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { GlobalProvider } from "./context/GlobalContext";
-import AdminPage from "./components/AdminPage";
-import HomePage from "./components/HomePage";
-import NotFoundPage from "./pages/NotFoundPage";
-import LoginPage from "./pages/LoginPage";
 import DarkModeToggle from "./components/DarkModeToggle";
-import "./App.css";
-
-const AdminWrapper = () => {
-  const { username } = useParams();
-  return <AdminPage username={username} />;
-};
-
-const PortfolioWrapper = () => {
-  const { username } = useParams();
-  return <HomePage username={username} />;
-};
+import HomePage from "./components/HomePage";
+import AdminPage from "./components/AdminPage";
+import ClientAdmin from "./components/ClientAdmin";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./components/RegisterPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 function App() {
   const [darkMode, setDarkMode] = useState(false);
 
-  useEffect(() => {
-    document.body.classList.toggle("dark", darkMode);
-  }, [darkMode]);
-
   return (
     <GlobalProvider>
       <div className={`App ${darkMode ? "dark-mode" : ""}`}>
-        <BrowserRouter>
+        <Router>
           <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
           <Routes>
-            <Route path="/" element={<HomePage username="guest" />} />
+            {/* Public Routes */}
+            <Route path="/" element={<Navigate to="/register" replace />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/admin/:username" element={<AdminWrapper />} />
-            <Route path="/portfolio/:username" element={<PortfolioWrapper />} />
+            <Route path="/portfolio/:username" element={<HomePage />} />
+
+            {/* Client Admin Routes */}
+            <Route path="/admin/dashboard" element={<ClientAdmin />} />
+            <Route path="/admin/:username" element={<AdminPage />} />
+
+            {/* Fallback */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
-        </BrowserRouter>
+        </Router>
       </div>
     </GlobalProvider>
   );
