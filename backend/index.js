@@ -13,7 +13,7 @@ const adminRoutes = require("./routes/admin");
 const app = express();
 const server = http.createServer(app);
 
-// ✅ Updated CORS setup using environment variable
+// ✅ CORS setup with preflight handling
 const allowedOrigin =
   process.env.FRONTEND_URL || "https://portfolio-frontend-clinton.onrender.com";
 
@@ -21,6 +21,19 @@ app.use(
   cors({
     origin: allowedOrigin,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Handle preflight OPTIONS requests globally
+app.options(
+  "*",
+  cors({
+    origin: allowedOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
