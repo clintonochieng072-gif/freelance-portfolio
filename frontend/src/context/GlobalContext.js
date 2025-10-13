@@ -32,7 +32,6 @@ export const GlobalProvider = ({ children }) => {
             setUser(data.user);
             setToken(savedToken);
           } else {
-            // Token invalid, clear it
             Cookies.remove("token");
           }
         } catch (error) {
@@ -50,6 +49,7 @@ export const GlobalProvider = ({ children }) => {
     setUser(userData);
     setToken(jwtToken);
     Cookies.set("token", jwtToken, { expires: 7 });
+    setLoading(false); // ✅ ensures immediate readiness after login
   };
 
   const logout = () => {

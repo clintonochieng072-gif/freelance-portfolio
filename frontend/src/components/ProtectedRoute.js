@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
 
 function ProtectedRoute({ children }) {
-  const { user, loading } = useGlobalContext();
+  const { token, loading } = useGlobalContext();
 
   if (loading) {
     return (
@@ -20,8 +20,7 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  if (!user) {
-    // Redirect to login if not authenticated
+  if (!token) {
     return <Navigate to="/login" replace />;
   }
 

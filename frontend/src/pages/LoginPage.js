@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
@@ -9,7 +9,6 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
   const { login } = useGlobalContext();
 
   const handleLogin = async (e) => {
@@ -30,9 +29,9 @@ function LoginPage() {
         login(data.user, data.token);
         setMessage("✅ Login successful!");
 
-        // Force navigation to dashboard
+        // Redirect user to dashboard and refresh app state
         setTimeout(() => {
-          navigate("/admin/dashboard", { replace: true });
+          window.location.href = "/admin/dashboard";
         }, 1000);
       } else {
         setMessage(`❌ ${data.error}`);
