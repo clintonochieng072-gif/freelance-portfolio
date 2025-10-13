@@ -13,15 +13,12 @@ const adminRoutes = require("./routes/admin");
 const app = express();
 const server = http.createServer(app);
 
-// CORS setup
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "https://portfolio-frontend-clinton.onrender.com",
-];
+// ✅ Updated CORS setup using environment variable
+const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
+
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: allowedOrigin,
     credentials: true,
   })
 );
@@ -30,7 +27,7 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// Routes - MUST BE ADDED!
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/portfolio", portfolioRoutes);
 app.use("/api/admin", adminRoutes);
@@ -66,10 +63,10 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Socket.io
+// Socket.io with updated CORS
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: allowedOrigin,
     methods: ["GET", "POST"],
     credentials: true,
   },
