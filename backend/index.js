@@ -13,44 +13,48 @@ const adminRoutes = require("./routes/admin");
 const app = express();
 const server = http.createServer(app);
 
-// ✅ CORS setup with preflight handling
-const allowedOrigin =
-  process.env.FRONTEND_URL || "https://portfolio-frontend-clinton.onrender.com";
+// ✅ FIXED: Proper CORS configuration with multiple allowed origins
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://portfolio-frontend-clinton.onrender.com",
+  process.env.FRONTEND_URL, // Optional: for additional environments
+].filter(Boolean); // Remove any undefined values
 
+// ✅ FIXED: Single, comprehensive CORS configuration
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        console.log("Blocked by CORS:", origin);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   })
 );
 
-// Handle preflight OPTIONS requests globally
-app.options(
-  "*",
-  cors({
-    origin: allowedOrigin,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+// ✅ REMOVED: Duplicate app.options() calls - the cors middleware handles OPTIONS automatically
 
 // Middlewares
 app.use(express.json());
 app.use(cookieParser());
 
-// Handle preflight requests
-app.options(
-  "*",
-  cors({
-    origin: allowedOrigin,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+// ✅ ADDED: Logging middleware to debug requests
+app.use((req, res, next) => {
+  console.log(
+    `${new Date().toISOString()} - ${req.method} ${req.path} - Origin: ${
+      req.headers.origin
+    }`
+  );
+  next();
+});
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -63,6 +67,7 @@ app.get("/", (req, res) => {
     status: "OK",
     message: "Portfolio SaaS Backend is running",
     version: "1.0.0",
+    allowedOrigins: allowedOrigins,
   });
 });
 
@@ -85,13 +90,14 @@ app.get("/api/health", (req, res) => {
     status: "OK",
     message: "Portfolio API is working",
     timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
   });
 });
 
-// Socket.io with updated CORS
+// ✅ FIXED: Socket.io with proper CORS configuration
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigin,
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -127,10 +133,33 @@ mongoose
   .then(() => console.log("MongoDB Atlas connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
+// ✅ ADDED: Global error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Error:", err.message);
+
+  if (err.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      error: "CORS Error",
+      message: "Origin not allowed",
+      yourOrigin: req.headers.origin,
+      allowedOrigins: allowedOrigins,
+    });
+  }
+
+  res.status(500).json({
+    error: "Internal Server Error",
+    message:
+      process.env.NODE_ENV === "production"
+        ? "Something went wrong!"
+        : err.message,
+  });
+});
+
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Multi-tenant portfolio SaaS running on port ${PORT}`);
+  console.log(`Allowed origins:`, allowedOrigins);
   console.log(`Available routes:`);
   console.log(`- GET  /api/health`);
   console.log(`- GET  /api/auth/*`);
