@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import Cookies from "js-cookie";
-import { FiEdit, FiTrash2, FiArrowRight, FiPlus } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiArrowRight } from "react-icons/fi";
 import "./Admin.css";
 
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";

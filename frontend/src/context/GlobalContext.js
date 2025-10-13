@@ -12,13 +12,13 @@ export const GlobalProvider = ({ children }) => {
   const [skills, setSkills] = useState([]);
   const [projects, setProjects] = useState([]);
 
-  // Check if user is logged in on app startup
+  // Check authentication status on app load
   useEffect(() => {
     const checkAuthStatus = async () => {
       const savedToken = Cookies.get("token");
+
       if (savedToken) {
         try {
-          // Verify token is still valid with backend
           const API_URL =
             process.env.REACT_APP_API_URL || "http://localhost:5000/api";
           const response = await fetch(`${API_URL}/auth/me`, {
@@ -32,7 +32,7 @@ export const GlobalProvider = ({ children }) => {
             setUser(data.user);
             setToken(savedToken);
           } else {
-            // Token is invalid, clear it
+            // Token invalid, clear it
             Cookies.remove("token");
           }
         } catch (error) {

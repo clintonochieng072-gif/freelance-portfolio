@@ -26,11 +26,13 @@ function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // Use context to login (which also sets cookie)
+        // Use context login which handles token and user state
         login(data.user, data.token);
         setMessage("✅ Login successful!");
+
+        // Force navigation to dashboard
         setTimeout(() => {
-          navigate("/admin/dashboard");
+          navigate("/admin/dashboard", { replace: true });
         }, 1000);
       } else {
         setMessage(`❌ ${data.error}`);
