@@ -2,7 +2,10 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+// ✅ Ensure correct API URL for production
+const API_URL =
+  process.env.REACT_APP_API_URL ||
+  "https://portfolio-backend-clinton.onrender.com/api";
 
 function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,12 +17,17 @@ function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setMessage("");
 
     try {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ email, password }),
+        // ✅ include credentials for cookie/session-based auth
+        credentials: "include",
       });
 
       const data = await res.json();
@@ -34,9 +42,10 @@ function LoginPage() {
           window.location.href = "/admin/dashboard";
         }, 1000);
       } else {
-        setMessage(`❌ ${data.error}`);
+        setMessage(`❌ ${data.error || "Invalid credentials"}`);
       }
     } catch (err) {
+      console.error("Login error:", err);
       setMessage("⚠️ Server error, try again later.");
     } finally {
       setLoading(false);
@@ -47,6 +56,7 @@ function LoginPage() {
     <div className="login-container">
       <div className="auth-card">
         <h2>Sign In to Your Portfolio</h2>
+
         <form onSubmit={handleLogin}>
           <input
             type="email"

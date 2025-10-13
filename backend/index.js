@@ -14,7 +14,8 @@ const app = express();
 const server = http.createServer(app);
 
 // ✅ Updated CORS setup using environment variable
-const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
+const allowedOrigin =
+  process.env.FRONTEND_URL || "https://portfolio-frontend-clinton.onrender.com";
 
 app.use(
   cors({

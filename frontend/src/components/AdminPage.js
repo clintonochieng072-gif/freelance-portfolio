@@ -5,8 +5,12 @@ import Cookies from "js-cookie";
 import { FiEdit, FiTrash2, FiArrowRight } from "react-icons/fi";
 import "./Admin.css";
 
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const SOCKET_URL =
+  process.env.REACT_APP_SOCKET_URL ||
+  "https://portfolio-backend-clinton.onrender.com";
+const API_URL =
+  process.env.REACT_APP_API_URL ||
+  "https://portfolio-backend-clinton.onrender.com/api";
 
 function AdminPage({ username }) {
   const [contacts, setContacts] = useState([]);
@@ -69,7 +73,10 @@ function AdminPage({ username }) {
 
     fetchPortfolio();
 
-    socketRef.current = io(SOCKET_URL);
+    socketRef.current = io(SOCKET_URL, {
+      transports: ["websocket"],
+      withCredentials: true,
+    });
     socketRef.current.emit("joinPortfolioRoom", username);
 
     socketRef.current.on(
