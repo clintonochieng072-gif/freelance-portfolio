@@ -41,6 +41,17 @@ app.options(
 app.use(express.json());
 app.use(cookieParser());
 
+// Handle preflight requests
+app.options(
+  "*",
+  cors({
+    origin: allowedOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/portfolio", portfolioRoutes);
