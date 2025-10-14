@@ -1,4 +1,4 @@
-/* global Cookies */
+import Cookies from "js-cookie";
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
@@ -11,7 +11,9 @@ import {
 } from "react-icons/fi";
 import "./Admin.css";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const API_URL =
+  process.env.REACT_APP_API_URL ||
+  "https://portfolio-backend-clinton.onrender.com/api";
 
 function ClientAdmin() {
   const [dashboardData, setDashboardData] = useState(null);
