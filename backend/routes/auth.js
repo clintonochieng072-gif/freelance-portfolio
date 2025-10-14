@@ -1,15 +1,33 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Portfolio = require("../models/Portfolio");
 
-// Client Registration
+/* =============================
+   🧩 Helper: Token Generation
+============================= */
+function generateToken(user) {
+  return jwt.sign(
+    {
+      userId: user._id,
+      username: user.username,
+      email: user.email,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+}
+
+/* =============================
+   🧩 Register User
+============================= */
 router.post("/register", async (req, res) => {
   try {
     const { username, email, password, displayName } = req.body;
 
-    // Check if user exists
+    // Check if user already exists
     const existingUser = await User.findOne({
       $or: [{ email }, { username }],
     });
@@ -24,7 +42,7 @@ router.post("/register", async (req, res) => {
     const user = new User({ username, email, password });
     await user.save();
 
-    // Create default portfolio
+    // Create default portfolio for new user
     const portfolio = new Portfolio({
       username,
       userId: user._id,
@@ -36,12 +54,8 @@ router.post("/register", async (req, res) => {
     });
     await portfolio.save();
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    // Generate JWT
+    const token = generateToken(user);
 
     res.status(201).json({
       message: "Registration successful",
@@ -59,7 +73,9 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// Client Login
+/* =============================
+   🧩 Login User
+============================= */
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -70,22 +86,26 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Check password
+    // Validate password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Update last login
+    // Update last login time
     user.lastLogin = new Date();
     await user.save();
 
     // Generate token
-    const token = jwt.sign(
-      { userId: user._id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = generateToken(user);
+
+    // ✅ Set cookie securely (works for dev + production)
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
 
     res.json({
       message: "Login successful",
@@ -103,36 +123,54 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Forgot password - send reset link
+/* =============================
+   🧩 Logout
+============================= */
+router.post("/logout", (req, res) => {
+  try {
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    });
+    res.json({ message: "Logged out successfully" });
+  } catch (err) {
+    console.error("Logout error:", err);
+    res.status(500).json({ error: "Logout failed" });
+  }
+});
+
+/* =============================
+   🧩 Forgot Password
+============================= */
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
 
     const user = await User.findOne({ email });
     if (!user) {
-      // Don't reveal if email exists for security
+      // Don't reveal existence of the email
       return res.json({
         message: "If the email exists, a reset link has been sent",
       });
     }
 
-    // Generate reset token (valid for 1 hour)
+    // Create reset token (expires in 1 hour)
     const resetToken = jwt.sign(
       { userId: user._id, type: "password_reset" },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
-    // For demo purposes, return the reset link
-    // In production, send this via email
+    // Reset link (frontend)
     const resetLink = `https://portfolio-frontend-clinton.onrender.com/reset-password?token=${resetToken}`;
 
     console.log(`Password reset link for ${email}: ${resetLink}`);
 
     res.json({
       message: "Password reset link has been generated",
-      resetLink: resetLink, // Remove this in production - just for demo
-      note: "In production, this link would be sent via email",
+      resetLink: resetLink, // For demo only — remove in production
+      note: "In production, this link should be sent via email",
     });
   } catch (err) {
     console.error("Forgot password error:", err);
@@ -140,27 +178,26 @@ router.post("/forgot-password", async (req, res) => {
   }
 });
 
-// Reset password
+/* =============================
+   🧩 Reset Password
+============================= */
 router.post("/reset-password", async (req, res) => {
   try {
     const { token, newPassword } = req.body;
 
-    // Verify the reset token
+    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Check if it's a password reset token
     if (decoded.type !== "password_reset") {
       return res.status(400).json({ error: "Invalid reset token" });
     }
 
     const user = await User.findById(decoded.userId);
-
     if (!user) {
       return res.status(400).json({ error: "Invalid or expired reset token" });
     }
 
-    // Update password
-    user.password = newPassword;
+    // Hash new password before saving
+    user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
     res.json({
@@ -173,24 +210,37 @@ router.post("/reset-password", async (req, res) => {
   }
 });
 
-// Get current user
+/* =============================
+   🧩 Get Current User (/me)
+============================= */
 router.get("/me", async (req, res) => {
   try {
-    const token = req.cookies?.token || req.headers["authorization"];
+    let token = req.cookies?.token || req.headers["authorization"];
+
     if (!token) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select("-password");
+    // Strip "Bearer " prefix if present
+    if (token.startsWith("Bearer ")) {
+      token = token.slice(7);
+    }
 
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded.userId).select("-password");
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
     res.json({ user });
   } catch (err) {
-    res.status(401).json({ error: "Invalid token" });
+    console.error("Token verification failed:", err.message);
+    res.status(401).json({
+      error: "Invalid or expired token",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 });
 
