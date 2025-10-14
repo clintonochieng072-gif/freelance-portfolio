@@ -10,14 +10,9 @@ import {
   FiExternalLink,
 } from "react-icons/fi";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
-
-// Helper function to get cookie value
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(";").shift();
-}
+const API_URL =
+  process.env.REACT_APP_API_URL ||
+  "https://portfolio-backend-clinton.onrender.com/api";
 
 function ClientAdmin() {
   const [dashboardData, setDashboardData] = useState(null);
@@ -30,7 +25,7 @@ function ClientAdmin() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const token = getCookie("token"); // Use the helper function
+      const token = localStorage.getItem("token");
 
       if (!token) {
         logout();
@@ -76,9 +71,10 @@ function ClientAdmin() {
 
   const updateProfile = async () => {
     try {
-      const token = getCookie("token"); // Use the helper function here too
+      const token = localStorage.getItem("token");
 
-      if (!token) {
+      if (!token || token === "undefined" || token === "null") {
+        localStorage.removeItem("token");
         logout();
         navigate("/login");
         return;

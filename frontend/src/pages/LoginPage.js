@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
 
 // ✅ Ensure correct API URL for production
@@ -13,6 +13,7 @@ function LoginPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useGlobalContext();
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -26,21 +27,16 @@ function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, password }),
-        // ✅ include credentials for cookie/session-based auth
-        credentials: "include",
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        // Use context login which handles token and user state
         login(data.user, data.token);
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
         setMessage("✅ Login successful!");
-
-        // Redirect user to dashboard and refresh app state
-        setTimeout(() => {
-          window.location.href = "/admin/dashboard";
-        }, 1000);
+        setTimeout(() => navigate("/admin/dashboard"), 800);
       } else {
         setMessage(`❌ ${data.error || "Invalid credentials"}`);
       }
