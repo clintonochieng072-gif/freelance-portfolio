@@ -1,19 +1,23 @@
-import Cookies from "js-cookie";
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
+// Remove the js-cookie import and use document.cookie directly or create a helper
 import {
+  FiLogOut,
+  FiBarChart2,
   FiUser,
   FiSettings,
-  FiBarChart2,
-  FiLogOut,
   FiExternalLink,
 } from "react-icons/fi";
-import "./Admin.css";
 
-const API_URL =
-  process.env.REACT_APP_API_URL ||
-  "https://portfolio-backend-clinton.onrender.com/api";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+
+// Helper function to get cookie value
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(";").shift();
+}
 
 function ClientAdmin() {
   const [dashboardData, setDashboardData] = useState(null);
@@ -26,7 +30,13 @@ function ClientAdmin() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const token = Cookies.get("token");
+      const token = getCookie("token"); // Use the helper function
+
+      if (!token) {
+        logout();
+        navigate("/login");
+        return;
+      }
 
       const res = await fetch(`${API_URL}/admin/dashboard`, {
         headers: {
@@ -66,7 +76,13 @@ function ClientAdmin() {
 
   const updateProfile = async () => {
     try {
-      const token = Cookies.get("token");
+      const token = getCookie("token"); // Use the helper function here too
+
+      if (!token) {
+        logout();
+        navigate("/login");
+        return;
+      }
 
       const res = await fetch(`${API_URL}/admin/profile`, {
         method: "PUT",
@@ -95,9 +111,12 @@ function ClientAdmin() {
     }
   };
 
-  if (loading)
+  // ✅ Correct: return early if loading (inside function)
+  if (loading) {
     return <div className="admin-container">Loading Dashboard...</div>;
+  }
 
+  // ✅ Main return JSX (inside function)
   return (
     <div className="admin-container">
       <div className="dashboard-header">
