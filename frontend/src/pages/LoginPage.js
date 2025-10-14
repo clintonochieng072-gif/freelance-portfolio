@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useGlobalContext } from "../context/GlobalContext";
-
-// ✅ Ensure correct API URL for production
+import { useGlobalContext } from "../context/GlobalContext"; // ✅ FIXED: Correct relative path
 const API_URL =
   process.env.REACT_APP_API_URL ||
   "https://portfolio-backend-clinton.onrender.com/api";
@@ -12,7 +10,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useGlobalContext();
+  const { login } = useGlobalContext(); // Update this to handle user only
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -26,19 +24,25 @@ function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include", // ✅ CRITICAL: Include cookies
         body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        login(data.user, data.token);
-        localStorage.setItem("token", data.token);
+        // Store user data, rely on cookie for auth
+        login(data.user);
         localStorage.setItem("user", JSON.stringify(data.user));
+        // Don't store token in localStorage - use cookie instead
+
         setMessage("✅ Login successful!");
         setTimeout(() => navigate("/admin/dashboard"), 800);
       } else {
         setMessage(`❌ ${data.error || "Invalid credentials"}`);
+        // Clear cookie on failed login
+        document.cookie =
+          "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       }
     } catch (err) {
       console.error("Login error:", err);
@@ -78,7 +82,6 @@ function LoginPage() {
         </div>
 
         {message && <p className="auth-message">{message}</p>}
-
         <div className="auth-footer">
           Don't have an account? <Link to="/register">Create Portfolio</Link>
         </div>
