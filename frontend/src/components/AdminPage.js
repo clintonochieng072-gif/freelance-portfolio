@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
-import { FiEdit, FiTrash2, FiArrowRight } from "react-icons/fi";
+import { FiTrash2, FiArrowRight } from "react-icons/fi"; // ✅ Removed FiEdit
 import { useGlobalContext } from "../context/GlobalContext";
 import "./Admin.css";
 
@@ -17,7 +17,7 @@ function AdminPage() {
   const { username: urlUsername } = useParams();
   const navigate = useNavigate();
   const { user, logout } = useGlobalContext();
-  const [effectiveUsername, setEffectiveUsername] = useState(null);
+  const [effectiveUsername, setEffectiveUsername] = useState(null); // For display/socket only
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("");
 
@@ -50,92 +50,57 @@ function AdminPage() {
 
   const socketRef = useRef(null);
 
-  // ✅ CRITICAL: Multi-layer username resolution
+  // ✅ DISPLAY ONLY: Resolve username for UI and socket room
   useEffect(() => {
-    const resolveUsername = async () => {
-      console.log("🔍 Resolving username...");
+    const resolveUsername = () => {
+      console.log("🔍 Resolving display username...");
       console.log("   - URL param:", urlUsername);
       console.log("   - Context user:", user?.username);
 
       let usernameToUse = null;
 
-      // 1. Try URL param first
       if (urlUsername && urlUsername !== "undefined") {
         usernameToUse = urlUsername;
-        console.log("✅ Using URL param:", usernameToUse);
-      }
-      // 2. Try context user
-      else if (user?.username) {
+        console.log("✅ Using URL param for display:", usernameToUse);
+      } else if (user?.username) {
         usernameToUse = user.username;
-        console.log("✅ Using context user:", usernameToUse);
-      }
-      // 3. Try cached user
-      else {
-        try {
-          const cached = localStorage.getItem("cachedUser");
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            usernameToUse = parsed.username;
-            console.log("✅ Using cached user:", usernameToUse);
-          }
-        } catch (err) {
-          console.error("Cache parse error:", err);
-        }
+        console.log("✅ Using context user for display:", usernameToUse);
       }
 
-      // 4. Last resort: Fetch from auth/me
-      if (!usernameToUse) {
-        try {
-          console.log("🔄 Fetching from /auth/me...");
-          const res = await fetch(`${API_URL}/auth/me`, {
-            credentials: "include",
-          });
-          if (res.ok) {
-            const data = await res.json();
-            usernameToUse = data.user?.username;
-            console.log("✅ Fetched from API:", usernameToUse);
-          }
-        } catch (err) {
-          console.error("API fetch failed:", err);
-        }
-      }
-
-      console.log("🎯 FINAL username:", usernameToUse);
-
-      if (!usernameToUse) {
-        console.error("❌ NO USERNAME FOUND - redirecting to login");
-        navigate("/login");
-        return;
-      }
-
+      console.log("🎯 Display username:", usernameToUse);
       setEffectiveUsername(usernameToUse);
-      setLoading(false);
     };
 
     resolveUsername();
-  }, [urlUsername, user, navigate]);
+  }, [urlUsername, user]);
 
-  // Load portfolio data
+  // ✅ CRITICAL FIX: Fetch portfolio WITHOUT username - backend uses auth cookie
   useEffect(() => {
-    if (!effectiveUsername) return;
-
     const fetchPortfolio = async () => {
       try {
-        console.log("📡 Loading portfolio for:", effectiveUsername);
-        const res = await fetch(`${API_URL}/portfolio/${effectiveUsername}`, {
+        console.log("📡 Loading user portfolio via auth cookie...");
+
+        // ✅ NO USERNAME IN URL - backend uses req.user.username from cookie
+        const res = await fetch(`${API_URL}/portfolio`, {
           credentials: "include",
         });
 
+        console.log("📡 Portfolio fetch status:", res.status);
+
         if (!res.ok) {
           if (res.status === 401) {
+            console.log("🚫 Unauthorized - logging out");
             logout();
             navigate("/login");
             return;
           }
-          throw new Error(`HTTP ${res.status}`);
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
 
         const data = await res.json();
+        console.log("✅ Portfolio loaded:", Object.keys(data).length, "items");
+
+        // Process contacts as array
         const contactArray = data.contacts
           ? Object.entries(data.contacts)
               .filter(([key, value]) => value && value.trim() !== "")
@@ -146,53 +111,82 @@ function AdminPage() {
         setSkills(data.skills || []);
         setProjects(data.projects || []);
         setTestimonials(data.testimonials || []);
+        setLoading(false);
       } catch (err) {
-        console.error("Portfolio fetch error:", err);
+        console.error("💥 Portfolio fetch error:", err);
+
+        // Fallback: try with username if available (for backward compatibility)
+        if (effectiveUsername) {
+          try {
+            console.log("🔄 Fallback: trying with username...");
+            const fallbackRes = await fetch(
+              `${API_URL}/portfolio/${effectiveUsername}`,
+              {
+                credentials: "include",
+              }
+            );
+            if (fallbackRes.ok) {
+              const data = await fallbackRes.json();
+              const contactArray = data.contacts
+                ? Object.entries(data.contacts)
+                    .filter(([key, value]) => value && value.trim() !== "")
+                    .map(([key, value]) => ({ key, value }))
+                : [];
+              setContacts(contactArray);
+              setSkills(data.skills || []);
+              setProjects(data.projects || []);
+              setTestimonials(data.testimonials || []);
+              setLoading(false);
+              return;
+            }
+          } catch (fallbackErr) {
+            console.error("Fallback fetch failed:", fallbackErr);
+          }
+        }
+
+        setLoading(false);
+        alert("Failed to load portfolio data. Please try refreshing.");
       }
     };
 
     fetchPortfolio();
 
-    // Socket setup
-    socketRef.current = io(SOCKET_URL, {
-      transports: ["websocket"],
-      withCredentials: true,
-    });
-    socketRef.current.emit("joinPortfolioRoom", effectiveUsername);
+    // Socket setup (optional - uses display username for room)
+    if (effectiveUsername) {
+      socketRef.current = io(SOCKET_URL, {
+        transports: ["websocket"],
+        withCredentials: true,
+      });
+      socketRef.current.emit("joinPortfolioRoom", effectiveUsername);
 
-    socketRef.current.on(
-      "portfolioUpdated",
-      ({ contacts, skills, projects, testimonials }) => {
-        if (contacts) {
-          const contactArray = Object.entries(contacts)
-            .filter(([key, value]) => value && value.trim() !== "")
-            .map(([key, value]) => ({ key, value }));
-          setContacts(contactArray);
+      socketRef.current.on(
+        "portfolioUpdated",
+        ({ contacts, skills, projects, testimonials }) => {
+          if (contacts) {
+            const contactArray = Object.entries(contacts)
+              .filter(([key, value]) => value && value.trim() !== "")
+              .map(([key, value]) => ({ key, value }));
+            setContacts(contactArray);
+          }
+          if (skills) setSkills(skills);
+          if (projects) setProjects(projects);
+          if (testimonials) setTestimonials(testimonials);
         }
-        if (skills) setSkills(skills);
-        if (projects) setProjects(projects);
-        if (testimonials) setTestimonials(testimonials);
-      }
-    );
+      );
 
-    return () => socketRef.current?.disconnect();
+      return () => socketRef.current?.disconnect();
+    }
   }, [effectiveUsername, logout, navigate]);
 
-  // ✅ ROBUST SAVE FUNCTION - NO MORE UNDEFINED!
+  // ✅ CRITICAL FIX: Save WITHOUT username - backend uses req.user.username
   const savePortfolio = async (
     updatedContacts,
     updatedSkills,
     updatedProjects,
     updatedTestimonials
   ) => {
-    if (!effectiveUsername) {
-      alert("❌ Cannot save: No username available");
-      console.error("💥 Save failed - no effectiveUsername");
-      return;
-    }
-
     try {
-      console.log("💾 Saving for:", effectiveUsername);
+      console.log("💾 Saving portfolio via auth cookie...");
 
       const contactsObj = {};
       updatedContacts.forEach((c) => {
@@ -201,13 +195,15 @@ function AdminPage() {
         }
       });
 
-      const updateUrl = `${API_URL}/portfolio/update/${effectiveUsername}`;
+      // ✅ FIXED: NO USERNAME IN URL - backend gets it from auth middleware
+      const updateUrl = `${API_URL}/portfolio/update`;
       console.log("📡 Save URL:", updateUrl);
+      console.log("🔐 User identified via auth cookie");
 
       const res = await fetch(updateUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        credentials: "include", // ✅ Auth cookie provides user identity
         body: JSON.stringify({
           contacts: contactsObj,
           skills: updatedSkills.filter((s) => s?.trim()),
@@ -234,14 +230,14 @@ function AdminPage() {
         data = { error: `HTTP ${res.status}` };
       }
 
-      console.log("📤 Save response:", data);
+      console.log("📤 Save response:", { status: res.status, data });
 
       if (res.ok) {
         setSaveStatus("Saved ✓");
         setTimeout(() => setSaveStatus(""), 2000);
 
+        // Notify via socket (optional)
         socketRef.current?.emit("portfolioUpdated", {
-          username: effectiveUsername,
           contacts: contactsObj,
           skills: updatedSkills.filter((s) => s?.trim()),
           projects: updatedProjects,
@@ -249,11 +245,13 @@ function AdminPage() {
         });
       } else {
         if (res.status === 401) {
+          console.log("🚫 Save 401 - unauthorized");
           logout();
           navigate("/login");
           return;
         }
-        alert(`Update failed: ${data.error || "Unknown error"}`);
+        console.error("Save failed:", data);
+        alert(`Update failed: ${data.error || `HTTP ${res.status}`}`);
       }
     } catch (err) {
       console.error("💥 Save error:", err);
@@ -261,15 +259,15 @@ function AdminPage() {
     }
   };
 
-  if (loading || !effectiveUsername) {
+  if (loading) {
     return (
       <div style={{ textAlign: "center", padding: "50px" }}>
-        {loading ? "Loading portfolio..." : "Resolving user..."}
+        <div>Loading portfolio...</div>
       </div>
     );
   }
 
-  // ===== ALL HANDLERS (UNCHANGED BUT USE effectiveUsername) =====
+  // ===== CONTACT HANDLERS =====
   const handleAddContact = () => setAddingContact(true);
   const handleContactChange = (field, value) =>
     setNewContact((prev) => ({ ...prev, [field]: value }));
@@ -300,7 +298,7 @@ function AdminPage() {
     savePortfolio(updated, skills, projects, testimonials);
   };
 
-  // Skills handlers
+  // ===== SKILLS HANDLERS =====
   const handleAddSkill = () => setAddingSkill(true);
   const handleNextSkill = () => {
     if (!newSkill?.trim()) return;
@@ -309,23 +307,26 @@ function AdminPage() {
     setNewSkill("");
     savePortfolio(contacts, updated, projects, testimonials);
   };
+
   const handleSaveSkill = () => {
     handleNextSkill();
     setAddingSkill(false);
   };
+
   const handleEditSkill = (index, value) => {
     const updated = [...skills];
     updated[index] = value;
     setSkills(updated);
     savePortfolio(contacts, updated, projects, testimonials);
   };
+
   const handleDeleteSkill = (index) => {
     const updated = skills.filter((_, i) => i !== index);
     setSkills(updated);
     savePortfolio(contacts, updated, projects, testimonials);
   };
 
-  // Projects handlers
+  // ===== PROJECTS HANDLERS =====
   const handleAddProject = () => setAddingProject(true);
   const handleNextProject = () => {
     const updated = [...projects, { ...newProject }];
@@ -333,23 +334,26 @@ function AdminPage() {
     setNewProject({ name: "", description: "", github: "", liveDemo: "" });
     savePortfolio(contacts, skills, updated, testimonials);
   };
+
   const handleSaveProject = () => {
     handleNextProject();
     setAddingProject(false);
   };
+
   const handleEditProject = (index, field, value) => {
     const updated = [...projects];
     updated[index][field] = value;
     setProjects(updated);
     savePortfolio(contacts, skills, updated, testimonials);
   };
+
   const handleDeleteProject = (index) => {
     const updated = projects.filter((_, i) => i !== index);
     setProjects(updated);
     savePortfolio(contacts, skills, updated, testimonials);
   };
 
-  // Testimonials handlers
+  // ===== TESTIMONIALS HANDLERS =====
   const handleAddTestimonial = () => setAddingTestimonial(true);
   const handleNextTestimonial = () => {
     const updated = [...testimonials, { ...newTestimonial }];
@@ -363,23 +367,26 @@ function AdminPage() {
     });
     savePortfolio(contacts, skills, projects, updated);
   };
+
   const handleSaveTestimonial = () => {
     handleNextTestimonial();
     setAddingTestimonial(false);
   };
+
   const handleEditTestimonial = (index, field, value) => {
     const updated = [...testimonials];
     updated[index][field] = value;
     setTestimonials(updated);
     savePortfolio(contacts, skills, projects, updated);
   };
+
   const handleDeleteTestimonial = (index) => {
     const updated = testimonials.filter((_, i) => i !== index);
     setTestimonials(updated);
     savePortfolio(contacts, skills, projects, updated);
   };
 
-  // Skills grid
+  // Skills grid layout
   const skillColumns = [[], []];
   skills.forEach((s, i) => {
     const colIndex = Math.floor((i % 16) / 8);
@@ -389,7 +396,7 @@ function AdminPage() {
   return (
     <div className="admin-container">
       <h1>
-        Admin Page - {effectiveUsername}
+        Admin Page {effectiveUsername ? `- ${effectiveUsername}` : ""}
         {saveStatus && (
           <span style={{ color: "green", marginLeft: "10px" }}>
             ✓ {saveStatus}
@@ -406,42 +413,67 @@ function AdminPage() {
           </button>
         </h2>
         {addingContact && (
-          <div style={{ marginBottom: "10px" }}>
+          <div
+            style={{
+              marginBottom: "10px",
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
             <input
               type="text"
               placeholder="Field name (e.g., Email, Phone)"
               value={newContact.key}
               onChange={(e) => handleContactChange("key", e.target.value)}
+              style={{ flex: "1", minWidth: "200px" }}
             />
             <input
               type="text"
               placeholder="Value"
               value={newContact.value}
               onChange={(e) => handleContactChange("value", e.target.value)}
+              style={{ flex: "1", minWidth: "200px" }}
             />
-            <button onClick={handleNextContact}>
+            <button onClick={handleNextContact} style={{ padding: "8px 12px" }}>
               <FiArrowRight /> Next
             </button>
-            <button onClick={handleSaveContact}>OK</button>
+            <button onClick={handleSaveContact} style={{ padding: "8px 12px" }}>
+              OK
+            </button>
           </div>
         )}
-        <ul>
+        <ul style={{ listStyle: "none", padding: 0 }}>
           {contacts.map((c, i) => (
-            <li key={i}>
+            <li
+              key={i}
+              style={{
+                display: "flex",
+                gap: "10px",
+                marginBottom: "10px",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
               <input
                 value={c.key}
                 onChange={(e) => handleEditContact(i, "key", e.target.value)}
                 placeholder="Field name"
+                style={{ flex: "1", minWidth: "150px" }}
               />
               <input
                 value={c.value}
                 onChange={(e) => handleEditContact(i, "value", e.target.value)}
                 placeholder="Value"
+                style={{ flex: "2", minWidth: "200px" }}
               />
-              <FiEdit style={{ cursor: "pointer", marginLeft: "5px" }} />
               <FiTrash2
                 onClick={() => handleDeleteContact(i)}
-                style={{ cursor: "pointer", marginLeft: "5px" }}
+                style={{
+                  cursor: "pointer",
+                  color: "#ff4444",
+                  fontSize: "18px",
+                }}
               />
             </li>
           ))}
@@ -457,12 +489,20 @@ function AdminPage() {
           </button>
         </h2>
         {addingSkill && (
-          <div style={{ marginBottom: "10px" }}>
+          <div
+            style={{
+              marginBottom: "10px",
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+            }}
+          >
             <input
               type="text"
               placeholder="Skill"
               value={newSkill}
               onChange={(e) => setNewSkill(e.target.value)}
+              style={{ flex: 1 }}
             />
             <button onClick={handleNextSkill}>
               <FiArrowRight /> Next
@@ -479,17 +519,17 @@ function AdminPage() {
               {col.map((s) => (
                 <div
                   key={s.index}
-                  style={{ display: "flex", alignItems: "center" }}
+                  style={{ display: "flex", alignItems: "center", gap: "5px" }}
                 >
                   <input
                     type="text"
                     value={s.value}
                     onChange={(e) => handleEditSkill(s.index, e.target.value)}
+                    style={{ flex: 1 }}
                   />
-                  <FiEdit style={{ cursor: "pointer", marginLeft: "5px" }} />
                   <FiTrash2
                     onClick={() => handleDeleteSkill(s.index)}
-                    style={{ cursor: "pointer", marginLeft: "5px" }}
+                    style={{ cursor: "pointer", color: "#ff4444" }}
                   />
                 </div>
               ))}
@@ -516,13 +556,13 @@ function AdminPage() {
                 setNewProject({ ...newProject, name: e.target.value })
               }
             />
-            <input
-              type="text"
+            <textarea
               placeholder="Description"
               value={newProject.description}
               onChange={(e) =>
                 setNewProject({ ...newProject, description: e.target.value })
               }
+              style={{ width: "100%", minHeight: "60px", margin: "5px 0" }}
             />
             <input
               type="text"
@@ -540,26 +580,36 @@ function AdminPage() {
                 setNewProject({ ...newProject, liveDemo: e.target.value })
               }
             />
-            <button onClick={handleNextProject}>
-              <FiArrowRight /> Next
-            </button>
-            <button onClick={handleSaveProject}>OK</button>
+            <div style={{ marginTop: "10px" }}>
+              <button onClick={handleNextProject}>
+                <FiArrowRight /> Next
+              </button>
+              <button onClick={handleSaveProject}>OK</button>
+            </div>
           </div>
         )}
-        <ul>
+        <ul style={{ listStyle: "none", padding: 0 }}>
           {projects.map((p, i) => (
-            <li key={i}>
+            <li
+              key={i}
+              style={{
+                marginBottom: "15px",
+                padding: "10px",
+                border: "1px solid #ddd",
+              }}
+            >
               <input
                 value={p.name}
                 onChange={(e) => handleEditProject(i, "name", e.target.value)}
                 placeholder="Project Name"
               />
-              <input
+              <textarea
                 value={p.description}
                 onChange={(e) =>
                   handleEditProject(i, "description", e.target.value)
                 }
                 placeholder="Description"
+                style={{ width: "100%", minHeight: "60px", margin: "5px 0" }}
               />
               <input
                 value={p.github}
@@ -573,10 +623,9 @@ function AdminPage() {
                 }
                 placeholder="Live Demo Link"
               />
-              <FiEdit style={{ cursor: "pointer", marginLeft: "5px" }} />
               <FiTrash2
                 onClick={() => handleDeleteProject(i)}
-                style={{ cursor: "pointer", marginLeft: "5px" }}
+                style={{ cursor: "pointer", color: "#ff4444", float: "right" }}
               />
             </li>
           ))}
@@ -613,7 +662,7 @@ function AdminPage() {
                   comment: e.target.value,
                 })
               }
-              style={{ width: "100%", minHeight: "60px" }}
+              style={{ width: "100%", minHeight: "80px", margin: "5px 0" }}
             />
             <input
               type="text"
@@ -648,19 +697,21 @@ function AdminPage() {
                 })
               }
             />
-            <button onClick={handleNextTestimonial}>
-              <FiArrowRight /> Next
-            </button>
-            <button onClick={handleSaveTestimonial}>OK</button>
+            <div style={{ marginTop: "10px" }}>
+              <button onClick={handleNextTestimonial}>
+                <FiArrowRight /> Next
+              </button>
+              <button onClick={handleSaveTestimonial}>OK</button>
+            </div>
           </div>
         )}
-        <ul>
+        <ul style={{ listStyle: "none", padding: 0 }}>
           {testimonials.map((t, i) => (
             <li
               key={i}
               style={{
                 marginBottom: "15px",
-                padding: "10px",
+                padding: "15px",
                 border: "1px solid #ddd",
               }}
             >
@@ -677,7 +728,7 @@ function AdminPage() {
                   handleEditTestimonial(i, "comment", e.target.value)
                 }
                 placeholder="Client Comment"
-                style={{ width: "100%", minHeight: "60px" }}
+                style={{ width: "100%", minHeight: "80px", margin: "5px 0" }}
               />
               <input
                 value={t.position}
@@ -700,10 +751,9 @@ function AdminPage() {
                 }
                 placeholder="Profile Picture URL"
               />
-              <FiEdit style={{ cursor: "pointer", marginLeft: "5px" }} />
               <FiTrash2
                 onClick={() => handleDeleteTestimonial(i)}
-                style={{ cursor: "pointer", marginLeft: "5px" }}
+                style={{ cursor: "pointer", color: "#ff4444", float: "right" }}
               />
             </li>
           ))}

@@ -22,7 +22,7 @@ function ClientAdmin() {
   const { logout, user } = useGlobalContext();
   const navigate = useNavigate();
 
-  // ✅ ENHANCED: Robust username resolution with caching
+  // ✅ Robust username resolution with multiple fallbacks
   const getCurrentUsername = useCallback(() => {
     // 1. Dashboard data (most reliable)
     if (dashboardData?.user?.username) {
@@ -42,7 +42,6 @@ function ClientAdmin() {
     } catch (err) {
       console.error("Cache parse error:", err);
     }
-    // 4. Return null if all fail
     return null;
   }, [dashboardData, user]);
 
@@ -62,8 +61,12 @@ function ClientAdmin() {
         return;
       }
 
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
       const data = await res.json();
-      console.log("✅ Dashboard data:", data.user?.username);
+      console.log("✅ Dashboard data loaded:", data.user?.username);
       setDashboardData(data);
       setProfile({
         displayName: data.portfolio?.displayName || "",
@@ -71,8 +74,11 @@ function ClientAdmin() {
       });
     } catch (err) {
       console.error("Dashboard fetch error:", err);
-      logout();
-      navigate("/login");
+      // Don't auto-logout on non-401 errors
+      if (err.message.includes("401")) {
+        logout();
+        navigate("/login");
+      }
     } finally {
       setLoading(false);
     }
@@ -82,12 +88,14 @@ function ClientAdmin() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // ✅ CRITICAL: Re-fetch dashboard when user changes (context sync)
+  // ✅ FIXED: ESLint compliant - proper dependency management
   useEffect(() => {
-    if (user && !dashboardData) {
+    // Only sync if we have context user but no dashboard user data
+    if (user?.username && !dashboardData?.user?.username) {
+      console.log("🔄 Syncing dashboard with context user:", user.username);
       fetchDashboardData();
     }
-  }, [user, fetchDashboardData]);
+  }, [user?.username, dashboardData?.user?.username, fetchDashboardData]); // ✅ Stable dependencies
 
   const handleLogout = () => {
     logout();
@@ -111,23 +119,31 @@ function ClientAdmin() {
 
       const data = await res.json();
       if (res.ok) {
-        alert("Profile updated successfully");
-        fetchDashboardData();
+        alert("Profile updated successfully!");
+        fetchDashboardData(); // Refresh dashboard data
       } else {
-        alert("Update failed: " + data.error);
+        alert(`Update failed: ${data.error || "Unknown error"}`);
       }
     } catch (err) {
       console.error("Profile update error:", err);
+      alert("Update failed. Please try again.");
     }
   };
 
   if (loading) {
-    return <div className="admin-container">Loading Dashboard...</div>;
+    return (
+      <div
+        className="admin-container"
+        style={{ textAlign: "center", padding: "50px" }}
+      >
+        <div>Loading Dashboard...</div>
+      </div>
+    );
   }
 
   const currentUsername = getCurrentUsername();
 
-  // ✅ DEBUG: Log username resolution
+  // ✅ Debug logging for username resolution
   console.log("🔍 ClientAdmin username resolution:", {
     currentUsername,
     hasDashboard: !!dashboardData?.user?.username,
@@ -136,7 +152,7 @@ function ClientAdmin() {
     contextUser: user?.username,
   });
 
-  // ✅ PREVENT RENDER IF NO USERNAME
+  // ✅ Prevent render without valid username
   if (!currentUsername) {
     return (
       <div
@@ -148,10 +164,14 @@ function ClientAdmin() {
         <ol>
           <li>Ensure you're logged in</li>
           <li>
-            <button onClick={fetchDashboardData}>Refresh Dashboard</button>
+            <button onClick={fetchDashboardData} className="action-btn">
+              Refresh Dashboard
+            </button>
           </li>
           <li>
-            <button onClick={handleLogout}>Logout & Login Again</button>
+            <button onClick={handleLogout} className="logout-btn">
+              Logout & Login Again
+            </button>
           </li>
         </ol>
       </div>
@@ -160,6 +180,7 @@ function ClientAdmin() {
 
   return (
     <div className="admin-container">
+      {/* Header */}
       <div className="dashboard-header">
         <div
           style={{
@@ -195,6 +216,7 @@ function ClientAdmin() {
         </div>
       </div>
 
+      {/* Navigation Tabs */}
       <div className="dashboard-tabs">
         <button
           className={activeTab === "overview" ? "active" : ""}
@@ -216,8 +238,10 @@ function ClientAdmin() {
         </button>
       </div>
 
+      {/* Overview Tab */}
       {activeTab === "overview" && (
         <div className="dashboard-content">
+          {/* Stats Grid */}
           <div className="stats-grid">
             <div className="stat-card">
               <h3>Projects</h3>
@@ -239,24 +263,25 @@ function ClientAdmin() {
             </div>
           </div>
 
+          {/* Quick Actions */}
           <div className="quick-actions">
             <h3>Quick Actions</h3>
             <div className="action-buttons">
               <a
-                href={`https://your-app.onrender.com/portfolio/${currentUsername}`} // ✅ Full URL for external
+                href={`${window.location.origin}/portfolio/${currentUsername}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="action-btn"
               >
                 <FiExternalLink /> View Your Portfolio
               </a>
-              {/* ✅ ENHANCED: Safe navigation with validation */}
+              {/* ✅ CRITICAL: SPA navigation to admin editor */}
               <Link
                 to={`/admin/${currentUsername}`}
                 className="action-btn"
                 onClick={() => {
                   console.log(
-                    "🔗 Navigating to admin:",
+                    "🔗 Navigating to admin editor:",
                     `/admin/${currentUsername}`
                   );
                 }}
@@ -266,6 +291,7 @@ function ClientAdmin() {
             </div>
           </div>
 
+          {/* Portfolio URL */}
           <div className="portfolio-preview">
             <h3>Your Portfolio URL</h3>
             <div className="portfolio-url">
@@ -276,6 +302,7 @@ function ClientAdmin() {
         </div>
       )}
 
+      {/* Profile Tab */}
       {activeTab === "profile" && (
         <div className="dashboard-content">
           <h3>Profile Settings</h3>
@@ -288,7 +315,7 @@ function ClientAdmin() {
                 onChange={(e) =>
                   setProfile({ ...profile, displayName: e.target.value })
                 }
-                placeholder="How you want to be displayed"
+                placeholder="How you want to be displayed on your portfolio"
               />
             </div>
             <div className="form-group">
@@ -309,6 +336,7 @@ function ClientAdmin() {
         </div>
       )}
 
+      {/* Settings Tab */}
       {activeTab === "settings" && (
         <div className="dashboard-content">
           <h3>Account Settings</h3>
