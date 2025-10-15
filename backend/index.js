@@ -55,6 +55,7 @@ app.use(
     credentials: true, // ✅ CRITICAL for cookies
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposedHeaders: ["Set-Cookie"], // Allow frontend to see cookies
   })
 );
 
