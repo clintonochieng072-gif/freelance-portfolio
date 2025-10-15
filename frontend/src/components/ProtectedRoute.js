@@ -3,7 +3,9 @@ import { Navigate } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
 
 function ProtectedRoute({ children }) {
-  const { token, loading } = useGlobalContext();
+  const { user, loading } = useGlobalContext(); // ✅ Check user, NOT token
+
+  console.log("🔒 ProtectedRoute check:", { user: !!user, loading });
 
   if (loading) {
     return (
@@ -20,7 +22,9 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  if (!token) {
+  if (!user) {
+    // ✅ Check user object, not token
+    console.log("🚫 No user - redirecting to login");
     return <Navigate to="/login" replace />;
   }
 

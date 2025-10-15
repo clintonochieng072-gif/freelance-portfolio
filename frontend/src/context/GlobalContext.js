@@ -1,71 +1,71 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import Cookies from "js-cookie";
 
 const GlobalContext = createContext();
 
 export const GlobalProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [contacts, setContacts] = useState({});
   const [skills, setSkills] = useState([]);
   const [projects, setProjects] = useState([]);
 
-  // Check authentication status on app load
+  // ✅ FIXED: Check auth using cookies (no token needed)
   useEffect(() => {
     const checkAuthStatus = async () => {
-      const savedToken = Cookies.get("token");
+      try {
+        const API_URL =
+          process.env.REACT_APP_API_URL ||
+          "https://portfolio-backend-clinton.onrender.com/api";
 
-      if (savedToken) {
-        try {
-          const API_URL =
-            process.env.REACT_APP_API_URL || "http://localhost:5000/api";
-          const response = await fetch(`${API_URL}/auth/me`, {
-            headers: {
-              Authorization: `Bearer ${savedToken}`,
-            },
-          });
+        console.log("🔍 Checking initial auth status...");
 
-          if (response.ok) {
-            const data = await response.json();
-            setUser(data.user);
-            setToken(savedToken);
-          } else {
-            Cookies.remove("token");
-          }
-        } catch (error) {
-          console.error("Auth check failed:", error);
-          Cookies.remove("token");
+        const response = await fetch(`${API_URL}/auth/me`, {
+          credentials: "include", // ✅ Use cookies, not Authorization header
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("✅ Initial auth restored:", data.user.username);
+          setUser(data.user);
+        } else {
+          console.log("❌ No active session found");
+          const authData = await response.json();
+          console.log("Auth check response:", authData);
         }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     checkAuthStatus();
   }, []);
 
-  const login = (userData, jwtToken) => {
+  // ✅ FIXED: Login accepts user only (no token needed)
+  const login = (userData) => {
+    console.log("🔐 Context login:", userData.username);
     setUser(userData);
-    setToken(jwtToken);
-    Cookies.set("token", jwtToken, { expires: 7 });
-    setLoading(false); // ✅ ensures immediate readiness after login
+    localStorage.setItem("user", JSON.stringify(userData));
+    setLoading(false);
   };
 
   const logout = () => {
     setUser(null);
-    setToken(null);
+    localStorage.removeItem("user");
+    // Backend clears httpOnly cookie
     setContacts({});
     setSkills([]);
     setProjects([]);
-    Cookies.remove("token");
   };
+
+  console.log("🌍 GlobalContext:", { user: !!user, loading });
 
   return (
     <GlobalContext.Provider
       value={{
         user,
-        token,
         loading,
         login,
         logout,

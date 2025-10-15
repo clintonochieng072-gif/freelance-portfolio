@@ -11,7 +11,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useGlobalContext();
+  const { login } = useGlobalContext(); // ✅ Only need login function
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -20,17 +20,17 @@ function LoginPage() {
     setMessage("");
 
     try {
-      console.log("🔄 Login attempt:", { email });
+      console.log("🔄 Login attempt for:", email);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s for Render cold start
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include", // Keep this for cookies
+        credentials: "include", // ✅ Backend sets httpOnly cookie
         signal: controller.signal,
         body: JSON.stringify({ email, password }),
       });
@@ -38,83 +38,47 @@ function LoginPage() {
       clearTimeout(timeoutId);
 
       console.log("📡 Response status:", response.status);
-      console.log("📡 Response type:", response.type);
       console.log("📡 Response ok:", response.ok);
 
-      // ✅ BACKEND WORKS - Try to read response even with CORS issues
-      let data;
-      try {
-        data = await response.json();
-        console.log("📄 Full response data:", data);
-      } catch (jsonErr) {
-        console.warn("⚠️ Could not parse JSON - CORS blocking response body");
-        // Backend succeeded (200) but CORS blocks body - use fallback
-        data = { message: "Login successful", user: { email } };
-      }
+      const data = await response.json();
+      console.log("📄 Response data:", data);
 
-      // ✅ If status is 200, assume success regardless of CORS headers
-      if (response.status === 200) {
-        // Backend set httpOnly cookie, store user data
-        login(data.user || { email });
-        localStorage.setItem("user", JSON.stringify(data.user || { email }));
+      if (response.ok && data.user) {
+        // ✅ CRITICAL: Call login with ONLY user data
+        // Backend handles httpOnly cookie automatically
+        login(data.user); // No token parameter needed
 
-        console.log("✅ Login processed - checking auth...");
+        // Store user data for context restoration
+        localStorage.setItem("user", JSON.stringify(data.user));
 
-        // ✅ Verify authentication with /me endpoint
-        setTimeout(async () => {
-          try {
-            const authCheck = await fetch(`${API_URL}/auth/me`, {
-              credentials: "include",
-            });
-            const authData = await authCheck.json();
+        console.log(
+          "✅ Login successful - user set in context:",
+          data.user.username
+        );
+        setMessage("✅ Login successful! Redirecting...");
 
-            if (authCheck.ok && authData.user) {
-              console.log("✅ Auth confirmed:", authData.user.username);
-              navigate("/admin/dashboard");
-            } else {
-              console.error("❌ Auth check failed:", authData);
-              setMessage("⚠️ Login succeeded but session not active");
-            }
-          } catch (authErr) {
-            console.error("❌ Auth verification failed:", authErr);
-            setMessage("⚠️ Cookie authentication failed - backend CORS issue");
-          }
+        // ✅ Immediate redirect - ProtectedRoute will use updated context
+        setTimeout(() => {
+          navigate("/admin/dashboard", { replace: true });
         }, 500);
 
-        setMessage("✅ Login initiated - redirecting...");
-        return; // Don't show error
+        return;
       } else {
-        setMessage(`❌ ${data?.error || "Login failed"}`);
+        console.error("❌ Login failed:", data.error);
+        setMessage(`❌ ${data.error || "Invalid credentials"}`);
+
+        // Clear any stale data
+        localStorage.removeItem("user");
       }
     } catch (err) {
       console.error("💥 Login error:", err);
 
       if (err.name === "AbortError") {
-        setMessage("⚠️ Login timeout - server slow");
+        setMessage("⚠️ Login timeout - server too slow");
       } else if (err.name === "TypeError" && err.message.includes("fetch")) {
-        // ✅ Network error but backend might still work
-        setMessage("⚠️ Network issue - retrying auth check...");
-
-        // Fallback: Try direct /me check (cookie might be set)
-        setTimeout(async () => {
-          try {
-            const authCheck = await fetch(`${API_URL}/auth/me`, {
-              credentials: "include",
-            });
-            if (authCheck.ok) {
-              const authData = await authCheck.json();
-              if (authData.user) {
-                login(authData.user);
-                localStorage.setItem("user", JSON.stringify(authData.user));
-                navigate("/admin/dashboard");
-              }
-            }
-          } catch (e) {
-            console.error("Fallback auth failed:", e);
-          }
-        }, 1000);
+        setMessage("⚠️ Network error - check connection");
       } else {
-        setMessage(`❌ ${err.message}`);
+        setMessage(`❌ ${err.message || "Login failed"}`);
       }
     } finally {
       setLoading(false);
@@ -125,6 +89,7 @@ function LoginPage() {
     <div className="login-container">
       <div className="auth-card">
         <h2>Sign In to Your Portfolio</h2>
+
         <form onSubmit={handleLogin}>
           <input
             type="email"
@@ -132,6 +97,7 @@ function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={loading}
           />
           <input
             type="password"
@@ -139,15 +105,27 @@ function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={loading}
           />
           <button type="submit" disabled={loading}>
             {loading ? "Signing In..." : "Sign In"}
           </button>
         </form>
+
         <div className="auth-links">
           <Link to="/forgot-password">Forgot your password?</Link>
         </div>
-        {message && <p className="auth-message">{message}</p>}
+
+        {message && (
+          <p
+            className={`auth-message ${
+              message.includes("✅") ? "success" : "error"
+            }`}
+          >
+            {message}
+          </p>
+        )}
+
         <div className="auth-footer">
           Don't have an account? <Link to="/register">Create Portfolio</Link>
         </div>
