@@ -1,8 +1,9 @@
 // src/components/AdminPage.js
 import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom"; // ✅ ADDED: Extract username from URL
+import { useParams, useNavigate } from "react-router-dom"; // ✅ useNavigate for redirects
 import { io } from "socket.io-client";
 import { FiEdit, FiTrash2, FiArrowRight } from "react-icons/fi";
+import { useGlobalContext } from "../context/GlobalContext"; // ✅ For context access
 import "./Admin.css";
 
 const SOCKET_URL =
@@ -13,7 +14,9 @@ const API_URL =
   "https://portfolio-backend-clinton.onrender.com/api";
 
 function AdminPage() {
-  const { username } = useParams(); // ✅ FIXED: Extract username from URL params
+  const { username } = useParams();
+  const navigate = useNavigate();
+  const { user, logout } = useGlobalContext(); // ✅ Access context user
   const [contacts, setContacts] = useState([]);
   const [skills, setSkills] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -36,34 +39,50 @@ function AdminPage() {
   });
   const [addingProject, setAddingProject] = useState(false);
 
-  // ✅ UPDATE Testimonials state with profile picture
   const [newTestimonial, setNewTestimonial] = useState({
     clientName: "",
     comment: "",
     position: "",
     company: "",
-    profilePicture: "", // ✅ ADD profile picture
+    profilePicture: "",
   });
   const [addingTestimonial, setAddingTestimonial] = useState(false);
 
   const socketRef = useRef(null);
 
-  // ✅ FIXED: Add username validation and use credentials
+  // ✅ ENHANCED: Validate username with fallback from context
   useEffect(() => {
-    if (!username) {
-      console.error("❌ No username provided - cannot load portfolio");
-      setLoading(false);
+    console.log("🔍 AdminPage - URL username:", username);
+    console.log("🔍 AdminPage - Context user:", user?.username);
+
+    // Fallback to context user if URL param missing
+    const effectiveUsername = username || user?.username;
+
+    if (!effectiveUsername) {
+      console.error("❌ No username available - redirecting to dashboard");
+      navigate("/admin/dashboard");
       return;
     }
 
-    console.log("🔍 Loading portfolio for username:", username);
-
     const fetchPortfolio = async () => {
       try {
-        const res = await fetch(`${API_URL}/portfolio/${username}`, {
-          credentials: "include", // ✅ FIXED: Use cookies for authentication
+        console.log("📡 Fetching portfolio for:", effectiveUsername);
+        const res = await fetch(`${API_URL}/portfolio/${effectiveUsername}`, {
+          credentials: "include", // ✅ Cookie-based auth
         });
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            console.error("❌ Unauthorized - logging out");
+            logout();
+            navigate("/login");
+            return;
+          }
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+
         const data = await res.json();
+        console.log("📄 Portfolio data loaded:", data);
 
         const contactArray = data.contacts
           ? Object.entries(data.contacts)
@@ -76,7 +95,7 @@ function AdminPage() {
         setProjects(data.projects || []);
         setTestimonials(data.testimonials || []);
       } catch (err) {
-        console.error("Error fetching portfolio:", err);
+        console.error("❌ Error fetching portfolio:", err);
       } finally {
         setLoading(false);
       }
@@ -84,60 +103,76 @@ function AdminPage() {
 
     fetchPortfolio();
 
-    socketRef.current = io(SOCKET_URL, {
-      transports: ["websocket"],
-      withCredentials: true, // ✅ FIXED: Use cookies for socket auth
-    });
-    socketRef.current.emit("joinPortfolioRoom", username);
+    // Socket setup with error handling
+    try {
+      socketRef.current = io(SOCKET_URL, {
+        transports: ["websocket"],
+        withCredentials: true,
+      });
+      socketRef.current.emit("joinPortfolioRoom", effectiveUsername);
 
-    socketRef.current.on(
-      "portfolioUpdated",
-      ({ contacts, skills, projects, testimonials }) => {
-        if (contacts) {
-          const contactArray = Object.entries(contacts)
-            .filter(([key, value]) => value && value.trim() !== "")
-            .map(([key, value]) => ({ key, value }));
-          setContacts(contactArray);
+      socketRef.current.on(
+        "portfolioUpdated",
+        ({ contacts, skills, projects, testimonials }) => {
+          console.log("🔄 Real-time portfolio update received");
+          if (contacts) {
+            const contactArray = Object.entries(contacts)
+              .filter(([key, value]) => value && value.trim() !== "")
+              .map(([key, value]) => ({ key, value }));
+            setContacts(contactArray);
+          }
+          if (skills) setSkills(skills);
+          if (projects) setProjects(projects);
+          if (testimonials) setTestimonials(testimonials);
         }
-        if (skills) setSkills(skills);
-        if (projects) setProjects(projects);
-        if (testimonials) setTestimonials(testimonials);
+      );
+    } catch (socketErr) {
+      console.error("❌ Socket connection failed:", socketErr);
+    }
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
       }
-    );
+    };
+  }, [username, user?.username, navigate, logout]);
 
-    return () => socketRef.current?.disconnect();
-  }, [username]); // ✅ FIXED: Add username dependency
-
-  // ✅ FIXED: Save portfolio function with proper auth and username validation
+  // ✅ ENHANCED: Robust save function with JSON parsing safety
   const savePortfolio = async (
     updatedContacts,
     updatedSkills,
     updatedProjects,
     updatedTestimonials
   ) => {
-    if (!username) {
-      console.error("❌ Cannot save - username is undefined");
-      alert("Error: Username not available");
+    const effectiveUsername = username || user?.username;
+
+    if (!effectiveUsername) {
+      console.error("❌ Cannot save - no username available");
+      alert(
+        "Error: Cannot save without username. Please refresh and try again."
+      );
       return;
     }
 
     try {
-      console.log("💾 Saving portfolio for:", username);
+      console.log("💾 Saving portfolio for:", effectiveUsername);
 
       const contactsObj = {};
       updatedContacts.forEach((c) => {
-        if (c.key && c.key.trim() !== "" && c.value && c.value.trim() !== "") {
+        if (c.key?.trim() && c.value?.trim()) {
           contactsObj[c.key] = c.value;
         }
       });
 
-      const res = await fetch(`${API_URL}/portfolio/update/${username}`, {
+      const updateUrl = `${API_URL}/portfolio/update/${effectiveUsername}`;
+      console.log("📡 Save URL:", updateUrl);
+
+      const res = await fetch(updateUrl, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          // ✅ FIXED: REMOVED Authorization header - use httpOnly cookie instead
         },
-        credentials: "include", // ✅ FIXED: Use httpOnly cookie for authentication
+        credentials: "include", // ✅ Cookie-based auth
         body: JSON.stringify({
           contacts: contactsObj,
           skills: updatedSkills.filter((s) => s && s.trim() !== ""),
@@ -147,7 +182,6 @@ function AdminPage() {
             github: p.github || "",
             liveDemo: p.liveDemo || "",
           })),
-          // ✅ UPDATE Testimonials with profile picture
           testimonials: updatedTestimonials.map((t) => ({
             clientName: t.clientName || "",
             comment: t.comment || "",
@@ -158,33 +192,66 @@ function AdminPage() {
         }),
       });
 
-      const data = await res.json();
+      console.log("📡 Response status:", res.status, res.statusText);
+
+      // ✅ SAFE JSON parsing
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        console.error("❌ JSON parse error:", jsonErr);
+        data = { error: `HTTP ${res.status}: Invalid response format` };
+      }
+
       console.log("📤 Save response:", data);
 
       if (res.ok) {
-        setSaveStatus("Saved");
+        setSaveStatus("Saved ✓");
         setTimeout(() => setSaveStatus(""), 2000);
 
-        socketRef.current.emit("portfolioUpdated", {
-          username,
-          contacts: contactsObj,
-          skills: updatedSkills.filter((s) => s && s.trim() !== ""),
-          projects: updatedProjects,
-          testimonials: updatedTestimonials,
-        });
+        if (socketRef.current) {
+          socketRef.current.emit("portfolioUpdated", {
+            username: effectiveUsername,
+            contacts: contactsObj,
+            skills: updatedSkills.filter((s) => s && s.trim() !== ""),
+            projects: updatedProjects,
+            testimonials: updatedTestimonials,
+          });
+        }
       } else {
-        alert("Update failed: " + (data.error || "Unknown error"));
+        if (res.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+        console.error("❌ Save failed:", data);
+        alert(`Update failed: ${data.error || `HTTP ${res.status}`}`);
       }
     } catch (err) {
-      console.error("Error saving portfolio:", err);
-      alert("Update failed: " + err.message);
+      console.error("💥 Save error:", err);
+      if (err.name === "AbortError") {
+        alert("Request timeout - please try again");
+      } else {
+        alert(`Update failed: ${err.message}`);
+      }
     }
   };
 
-  if (loading) return <p>Loading Admin Page...</p>;
-  if (!username) return <p>Error: No username provided</p>; // ✅ FIXED: Handle missing username
+  if (loading)
+    return (
+      <div style={{ textAlign: "center", padding: "50px" }}>
+        Loading Admin Page...
+      </div>
+    );
+  if (!username && !user?.username) {
+    return (
+      <div style={{ textAlign: "center", padding: "50px" }}>
+        Error: No username available. Redirecting...
+      </div>
+    );
+  }
 
-  // ===== CONTACTS =====
+  // ===== CONTACTS HANDLERS =====
   const handleAddContact = () => setAddingContact(true);
   const handleContactChange = (field, value) =>
     setNewContact({ ...newContact, [field]: value });
@@ -212,7 +279,7 @@ function AdminPage() {
     savePortfolio(updated, skills, projects, testimonials);
   };
 
-  // ===== SKILLS =====
+  // ===== SKILLS HANDLERS =====
   const handleAddSkill = () => setAddingSkill(true);
   const handleNextSkill = () => {
     if (!newSkill.trim()) return;
@@ -238,7 +305,7 @@ function AdminPage() {
     savePortfolio(contacts, updated, projects, testimonials);
   };
 
-  // ===== PROJECTS =====
+  // ===== PROJECTS HANDLERS =====
   const handleAddProject = () => setAddingProject(true);
   const handleNextProject = () => {
     const updated = [...projects, { ...newProject }];
@@ -262,7 +329,7 @@ function AdminPage() {
     savePortfolio(contacts, skills, updated, testimonials);
   };
 
-  // ===== TESTIMONIALS =====
+  // ===== TESTIMONIALS HANDLERS =====
   const handleAddTestimonial = () => setAddingTestimonial(true);
   const handleNextTestimonial = () => {
     const updated = [...testimonials, { ...newTestimonial }];
@@ -292,7 +359,7 @@ function AdminPage() {
     savePortfolio(contacts, skills, projects, updated);
   };
 
-  // ===== SKILLS GRID =====
+  // ===== SKILLS GRID LAYOUT =====
   const skillColumns = [[], []];
   skills.forEach((s, i) => {
     const colIndex = Math.floor((i % 16) / 8);
@@ -302,7 +369,7 @@ function AdminPage() {
   return (
     <div className="admin-container">
       <h1>
-        Admin Page - {username}
+        Admin Page - {username || user?.username}
         {saveStatus && (
           <span style={{ color: "green", marginLeft: "10px" }}>
             ✓ {saveStatus}
@@ -310,7 +377,7 @@ function AdminPage() {
         )}
       </h1>
 
-      {/* ===== CONTACTS ===== */}
+      {/* ===== CONTACTS SECTION ===== */}
       <section>
         <h2>
           Contacts{" "}
@@ -363,7 +430,7 @@ function AdminPage() {
         </ul>
       </section>
 
-      {/* ===== SKILLS ===== */}
+      {/* ===== SKILLS SECTION ===== */}
       <section>
         <h2>
           Skills{" "}
@@ -413,7 +480,7 @@ function AdminPage() {
         </div>
       </section>
 
-      {/* ===== PROJECTS ===== */}
+      {/* ===== PROJECTS SECTION ===== */}
       <section>
         <h2>
           Projects{" "}
@@ -502,7 +569,7 @@ function AdminPage() {
         </ul>
       </section>
 
-      {/* ===== TESTIMONIALS ===== */}
+      {/* ===== TESTIMONIALS SECTION ===== */}
       <section>
         <h2>
           Testimonials{" "}
@@ -556,7 +623,6 @@ function AdminPage() {
                 })
               }
             />
-            {/* ✅ ADD Profile Picture Input */}
             <input
               type="text"
               placeholder="Profile Picture URL (optional)"
@@ -616,7 +682,6 @@ function AdminPage() {
                 }
                 placeholder="Client Company"
               />
-              {/* ✅ ADD Profile Picture Edit */}
               <input
                 type="text"
                 value={t.profilePicture}

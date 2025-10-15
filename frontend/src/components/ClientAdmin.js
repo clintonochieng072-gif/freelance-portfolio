@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom"; // ✅ ADDED: Link import
 import { useGlobalContext } from "../context/GlobalContext";
-// Remove the js-cookie import and use document.cookie directly or create a helper
 import {
   FiLogOut,
   FiBarChart2,
@@ -20,23 +19,14 @@ function ClientAdmin() {
   const [activeTab, setActiveTab] = useState("overview");
   const [profile, setProfile] = useState({ displayName: "", email: "" });
 
-  const { logout } = useGlobalContext();
+  const { logout, user } = useGlobalContext(); // ✅ USE context user
   const navigate = useNavigate();
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        logout();
-        navigate("/login");
-        return;
-      }
-
+      // ✅ FIXED: Use cookies, not Bearer token
       const res = await fetch(`${API_URL}/admin/dashboard`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: "include", // ✅ httpOnly cookie auth
       });
 
       if (res.status === 401) {
@@ -71,21 +61,13 @@ function ClientAdmin() {
 
   const updateProfile = async () => {
     try {
-      const token = localStorage.getItem("token");
-
-      if (!token || token === "undefined" || token === "null") {
-        localStorage.removeItem("token");
-        logout();
-        navigate("/login");
-        return;
-      }
-
+      // ✅ FIXED: Use cookies, not Bearer token
       const res = await fetch(`${API_URL}/admin/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include", // ✅ httpOnly cookie auth
         body: JSON.stringify(profile),
       });
 
@@ -107,12 +89,13 @@ function ClientAdmin() {
     }
   };
 
-  // ✅ Correct: return early if loading (inside function)
   if (loading) {
     return <div className="admin-container">Loading Dashboard...</div>;
   }
 
-  // ✅ Main return JSX (inside function)
+  // ✅ USE context user as fallback
+  const currentUsername = dashboardData?.user?.username || user?.username;
+
   return (
     <div className="admin-container">
       <div className="dashboard-header">
@@ -125,7 +108,7 @@ function ClientAdmin() {
           }}
         >
           <div>
-            <h1>Welcome, {dashboardData?.user?.username}!</h1>
+            <h1>Welcome, {currentUsername}!</h1>
             <div className="plan-badge">{dashboardData?.user?.plan} plan</div>
           </div>
           <button
@@ -196,32 +179,34 @@ function ClientAdmin() {
             <h3>Quick Actions</h3>
             <div className="action-buttons">
               <a
-                href={`/portfolio/${dashboardData?.user?.username}`}
+                href={`/portfolio/${currentUsername}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="action-btn"
               >
                 <FiExternalLink /> View Your Portfolio
               </a>
-              <a
-                href={`/admin/${dashboardData?.user?.username}`}
+              {/* ✅ FIXED: Use Link instead of <a> for SPA navigation */}
+              <Link
+                to={`/admin/${currentUsername}`} // ✅ Correct username param
                 className="action-btn"
               >
                 Edit Portfolio Content
-              </a>
+              </Link>
             </div>
           </div>
 
           <div className="portfolio-preview">
             <h3>Your Portfolio URL</h3>
             <div className="portfolio-url">
-              {window.location.origin}/portfolio/{dashboardData?.user?.username}
+              {window.location.origin}/portfolio/{currentUsername}
             </div>
             <small>Share this link with clients and employers</small>
           </div>
         </div>
       )}
 
+      {/* Profile and Settings tabs remain the same */}
       {activeTab === "profile" && (
         <div className="dashboard-content">
           <h3>Profile Settings</h3>
