@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom"; // ✅ ADDED: Link import
+import { useNavigate, Link } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
 import {
   FiLogOut,
@@ -19,30 +19,58 @@ function ClientAdmin() {
   const [activeTab, setActiveTab] = useState("overview");
   const [profile, setProfile] = useState({ displayName: "", email: "" });
 
-  const { logout, user } = useGlobalContext(); // ✅ USE context user
+  const { logout, user } = useGlobalContext();
   const navigate = useNavigate();
+
+  // ✅ ENHANCED: Robust username resolution with caching
+  const getCurrentUsername = useCallback(() => {
+    // 1. Dashboard data (most reliable)
+    if (dashboardData?.user?.username) {
+      return dashboardData.user.username;
+    }
+    // 2. Context user
+    if (user?.username) {
+      return user.username;
+    }
+    // 3. Cached user from localStorage
+    try {
+      const cached = localStorage.getItem("cachedUser");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed.username;
+      }
+    } catch (err) {
+      console.error("Cache parse error:", err);
+    }
+    // 4. Return null if all fail
+    return null;
+  }, [dashboardData, user]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      // ✅ FIXED: Use cookies, not Bearer token
+      console.log("📡 Fetching dashboard...");
       const res = await fetch(`${API_URL}/admin/dashboard`, {
-        credentials: "include", // ✅ httpOnly cookie auth
+        credentials: "include",
       });
 
+      console.log("📡 Dashboard response status:", res.status);
+
       if (res.status === 401) {
+        console.log("🚫 Dashboard 401 - logging out");
         logout();
         navigate("/login");
         return;
       }
 
       const data = await res.json();
+      console.log("✅ Dashboard data:", data.user?.username);
       setDashboardData(data);
       setProfile({
         displayName: data.portfolio?.displayName || "",
         email: data.user?.email || "",
       });
     } catch (err) {
-      console.error("Error fetching dashboard:", err);
+      console.error("Dashboard fetch error:", err);
       logout();
       navigate("/login");
     } finally {
@@ -54,6 +82,13 @@ function ClientAdmin() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  // ✅ CRITICAL: Re-fetch dashboard when user changes (context sync)
+  useEffect(() => {
+    if (user && !dashboardData) {
+      fetchDashboardData();
+    }
+  }, [user, fetchDashboardData]);
+
   const handleLogout = () => {
     logout();
     navigate("/login");
@@ -61,13 +96,10 @@ function ClientAdmin() {
 
   const updateProfile = async () => {
     try {
-      // ✅ FIXED: Use cookies, not Bearer token
       const res = await fetch(`${API_URL}/admin/profile`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // ✅ httpOnly cookie auth
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(profile),
       });
 
@@ -85,7 +117,7 @@ function ClientAdmin() {
         alert("Update failed: " + data.error);
       }
     } catch (err) {
-      console.error("Error updating profile:", err);
+      console.error("Profile update error:", err);
     }
   };
 
@@ -93,8 +125,38 @@ function ClientAdmin() {
     return <div className="admin-container">Loading Dashboard...</div>;
   }
 
-  // ✅ USE context user as fallback
-  const currentUsername = dashboardData?.user?.username || user?.username;
+  const currentUsername = getCurrentUsername();
+
+  // ✅ DEBUG: Log username resolution
+  console.log("🔍 ClientAdmin username resolution:", {
+    currentUsername,
+    hasDashboard: !!dashboardData?.user?.username,
+    hasContext: !!user?.username,
+    dashboardUser: dashboardData?.user?.username,
+    contextUser: user?.username,
+  });
+
+  // ✅ PREVENT RENDER IF NO USERNAME
+  if (!currentUsername) {
+    return (
+      <div
+        className="admin-container"
+        style={{ textAlign: "center", padding: "50px" }}
+      >
+        <h2>❌ Cannot load dashboard</h2>
+        <p>No username available. Please:</p>
+        <ol>
+          <li>Ensure you're logged in</li>
+          <li>
+            <button onClick={fetchDashboardData}>Refresh Dashboard</button>
+          </li>
+          <li>
+            <button onClick={handleLogout}>Logout & Login Again</button>
+          </li>
+        </ol>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-container">
@@ -109,7 +171,9 @@ function ClientAdmin() {
         >
           <div>
             <h1>Welcome, {currentUsername}!</h1>
-            <div className="plan-badge">{dashboardData?.user?.plan} plan</div>
+            <div className="plan-badge">
+              {dashboardData?.user?.plan || "Free"} plan
+            </div>
           </div>
           <button
             onClick={handleLogout}
@@ -179,17 +243,23 @@ function ClientAdmin() {
             <h3>Quick Actions</h3>
             <div className="action-buttons">
               <a
-                href={`/portfolio/${currentUsername}`}
+                href={`https://your-app.onrender.com/portfolio/${currentUsername}`} // ✅ Full URL for external
                 target="_blank"
                 rel="noopener noreferrer"
                 className="action-btn"
               >
                 <FiExternalLink /> View Your Portfolio
               </a>
-              {/* ✅ FIXED: Use Link instead of <a> for SPA navigation */}
+              {/* ✅ ENHANCED: Safe navigation with validation */}
               <Link
-                to={`/admin/${currentUsername}`} // ✅ Correct username param
+                to={`/admin/${currentUsername}`}
                 className="action-btn"
+                onClick={() => {
+                  console.log(
+                    "🔗 Navigating to admin:",
+                    `/admin/${currentUsername}`
+                  );
+                }}
               >
                 Edit Portfolio Content
               </Link>
@@ -206,7 +276,6 @@ function ClientAdmin() {
         </div>
       )}
 
-      {/* Profile and Settings tabs remain the same */}
       {activeTab === "profile" && (
         <div className="dashboard-content">
           <h3>Profile Settings</h3>
@@ -245,7 +314,7 @@ function ClientAdmin() {
           <h3>Account Settings</h3>
           <div className="settings-list">
             <div className="setting-item">
-              <h4>Current Plan: {dashboardData?.user?.plan}</h4>
+              <h4>Current Plan: {dashboardData?.user?.plan || "Free"}</h4>
               <p>Upgrade for custom domains and advanced features</p>
               <button className="upgrade-btn">Upgrade Plan</button>
             </div>

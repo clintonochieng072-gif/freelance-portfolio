@@ -3,9 +3,13 @@ import { Navigate } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
 
 function ProtectedRoute({ children }) {
-  const { user, loading } = useGlobalContext(); // ✅ Check user, NOT token
+  const { user, loading } = useGlobalContext();
 
-  console.log("🔒 ProtectedRoute check:", { user: !!user, loading });
+  console.log("🔒 ProtectedRoute:", {
+    user: !!user,
+    loading,
+    username: user?.username,
+  });
 
   if (loading) {
     return (
@@ -15,16 +19,23 @@ function ProtectedRoute({ children }) {
           justifyContent: "center",
           alignItems: "center",
           height: "100vh",
+          fontSize: "18px",
         }}
       >
-        <div>Checking authentication...</div>
+        Checking authentication...
       </div>
     );
   }
 
-  if (!user) {
-    // ✅ Check user object, not token
-    console.log("🚫 No user - redirecting to login");
+  // ✅ ENHANCED: Multiple checks for user validity
+  const isAuthenticated =
+    user &&
+    user.username &&
+    typeof user.username === "string" &&
+    user.username.trim() !== "";
+
+  if (!isAuthenticated) {
+    console.log("🚫 Redirecting to login - no valid user");
     return <Navigate to="/login" replace />;
   }
 

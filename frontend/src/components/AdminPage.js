@@ -1,9 +1,9 @@
 // src/components/AdminPage.js
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom"; // ✅ useNavigate for redirects
+import { useParams, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import { FiEdit, FiTrash2, FiArrowRight } from "react-icons/fi";
-import { useGlobalContext } from "../context/GlobalContext"; // ✅ For context access
+import { useGlobalContext } from "../context/GlobalContext";
 import "./Admin.css";
 
 const SOCKET_URL =
@@ -14,23 +14,24 @@ const API_URL =
   "https://portfolio-backend-clinton.onrender.com/api";
 
 function AdminPage() {
-  const { username } = useParams();
+  const { username: urlUsername } = useParams();
   const navigate = useNavigate();
-  const { user, logout } = useGlobalContext(); // ✅ Access context user
+  const { user, logout } = useGlobalContext();
+  const [effectiveUsername, setEffectiveUsername] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState("");
+
+  // Data states
   const [contacts, setContacts] = useState([]);
   const [skills, setSkills] = useState([]);
   const [projects, setProjects] = useState([]);
   const [testimonials, setTestimonials] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saveStatus, setSaveStatus] = useState("");
 
-  // Add/Edit states
+  // Form states
   const [newContact, setNewContact] = useState({ key: "", value: "" });
   const [addingContact, setAddingContact] = useState(false);
-
   const [newSkill, setNewSkill] = useState("");
   const [addingSkill, setAddingSkill] = useState(false);
-
   const [newProject, setNewProject] = useState({
     name: "",
     description: "",
@@ -38,7 +39,6 @@ function AdminPage() {
     liveDemo: "",
   });
   const [addingProject, setAddingProject] = useState(false);
-
   const [newTestimonial, setNewTestimonial] = useState({
     clientName: "",
     comment: "",
@@ -50,40 +50,92 @@ function AdminPage() {
 
   const socketRef = useRef(null);
 
-  // ✅ ENHANCED: Validate username with fallback from context
+  // ✅ CRITICAL: Multi-layer username resolution
   useEffect(() => {
-    console.log("🔍 AdminPage - URL username:", username);
-    console.log("🔍 AdminPage - Context user:", user?.username);
+    const resolveUsername = async () => {
+      console.log("🔍 Resolving username...");
+      console.log("   - URL param:", urlUsername);
+      console.log("   - Context user:", user?.username);
 
-    // Fallback to context user if URL param missing
-    const effectiveUsername = username || user?.username;
+      let usernameToUse = null;
 
-    if (!effectiveUsername) {
-      console.error("❌ No username available - redirecting to dashboard");
-      navigate("/admin/dashboard");
-      return;
-    }
+      // 1. Try URL param first
+      if (urlUsername && urlUsername !== "undefined") {
+        usernameToUse = urlUsername;
+        console.log("✅ Using URL param:", usernameToUse);
+      }
+      // 2. Try context user
+      else if (user?.username) {
+        usernameToUse = user.username;
+        console.log("✅ Using context user:", usernameToUse);
+      }
+      // 3. Try cached user
+      else {
+        try {
+          const cached = localStorage.getItem("cachedUser");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            usernameToUse = parsed.username;
+            console.log("✅ Using cached user:", usernameToUse);
+          }
+        } catch (err) {
+          console.error("Cache parse error:", err);
+        }
+      }
+
+      // 4. Last resort: Fetch from auth/me
+      if (!usernameToUse) {
+        try {
+          console.log("🔄 Fetching from /auth/me...");
+          const res = await fetch(`${API_URL}/auth/me`, {
+            credentials: "include",
+          });
+          if (res.ok) {
+            const data = await res.json();
+            usernameToUse = data.user?.username;
+            console.log("✅ Fetched from API:", usernameToUse);
+          }
+        } catch (err) {
+          console.error("API fetch failed:", err);
+        }
+      }
+
+      console.log("🎯 FINAL username:", usernameToUse);
+
+      if (!usernameToUse) {
+        console.error("❌ NO USERNAME FOUND - redirecting to login");
+        navigate("/login");
+        return;
+      }
+
+      setEffectiveUsername(usernameToUse);
+      setLoading(false);
+    };
+
+    resolveUsername();
+  }, [urlUsername, user, navigate]);
+
+  // Load portfolio data
+  useEffect(() => {
+    if (!effectiveUsername) return;
 
     const fetchPortfolio = async () => {
       try {
-        console.log("📡 Fetching portfolio for:", effectiveUsername);
+        console.log("📡 Loading portfolio for:", effectiveUsername);
         const res = await fetch(`${API_URL}/portfolio/${effectiveUsername}`, {
-          credentials: "include", // ✅ Cookie-based auth
+          credentials: "include",
         });
 
         if (!res.ok) {
           if (res.status === 401) {
-            console.error("❌ Unauthorized - logging out");
             logout();
             navigate("/login");
             return;
           }
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          throw new Error(`HTTP ${res.status}`);
         }
 
         const data = await res.json();
-        console.log("📄 Portfolio data loaded:", data);
-
         const contactArray = data.contacts
           ? Object.entries(data.contacts)
               .filter(([key, value]) => value && value.trim() !== "")
@@ -95,67 +147,52 @@ function AdminPage() {
         setProjects(data.projects || []);
         setTestimonials(data.testimonials || []);
       } catch (err) {
-        console.error("❌ Error fetching portfolio:", err);
-      } finally {
-        setLoading(false);
+        console.error("Portfolio fetch error:", err);
       }
     };
 
     fetchPortfolio();
 
-    // Socket setup with error handling
-    try {
-      socketRef.current = io(SOCKET_URL, {
-        transports: ["websocket"],
-        withCredentials: true,
-      });
-      socketRef.current.emit("joinPortfolioRoom", effectiveUsername);
+    // Socket setup
+    socketRef.current = io(SOCKET_URL, {
+      transports: ["websocket"],
+      withCredentials: true,
+    });
+    socketRef.current.emit("joinPortfolioRoom", effectiveUsername);
 
-      socketRef.current.on(
-        "portfolioUpdated",
-        ({ contacts, skills, projects, testimonials }) => {
-          console.log("🔄 Real-time portfolio update received");
-          if (contacts) {
-            const contactArray = Object.entries(contacts)
-              .filter(([key, value]) => value && value.trim() !== "")
-              .map(([key, value]) => ({ key, value }));
-            setContacts(contactArray);
-          }
-          if (skills) setSkills(skills);
-          if (projects) setProjects(projects);
-          if (testimonials) setTestimonials(testimonials);
+    socketRef.current.on(
+      "portfolioUpdated",
+      ({ contacts, skills, projects, testimonials }) => {
+        if (contacts) {
+          const contactArray = Object.entries(contacts)
+            .filter(([key, value]) => value && value.trim() !== "")
+            .map(([key, value]) => ({ key, value }));
+          setContacts(contactArray);
         }
-      );
-    } catch (socketErr) {
-      console.error("❌ Socket connection failed:", socketErr);
-    }
-
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
+        if (skills) setSkills(skills);
+        if (projects) setProjects(projects);
+        if (testimonials) setTestimonials(testimonials);
       }
-    };
-  }, [username, user?.username, navigate, logout]);
+    );
 
-  // ✅ ENHANCED: Robust save function with JSON parsing safety
+    return () => socketRef.current?.disconnect();
+  }, [effectiveUsername, logout, navigate]);
+
+  // ✅ ROBUST SAVE FUNCTION - NO MORE UNDEFINED!
   const savePortfolio = async (
     updatedContacts,
     updatedSkills,
     updatedProjects,
     updatedTestimonials
   ) => {
-    const effectiveUsername = username || user?.username;
-
     if (!effectiveUsername) {
-      console.error("❌ Cannot save - no username available");
-      alert(
-        "Error: Cannot save without username. Please refresh and try again."
-      );
+      alert("❌ Cannot save: No username available");
+      console.error("💥 Save failed - no effectiveUsername");
       return;
     }
 
     try {
-      console.log("💾 Saving portfolio for:", effectiveUsername);
+      console.log("💾 Saving for:", effectiveUsername);
 
       const contactsObj = {};
       updatedContacts.forEach((c) => {
@@ -169,13 +206,11 @@ function AdminPage() {
 
       const res = await fetch(updateUrl, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // ✅ Cookie-based auth
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           contacts: contactsObj,
-          skills: updatedSkills.filter((s) => s && s.trim() !== ""),
+          skills: updatedSkills.filter((s) => s?.trim()),
           projects: updatedProjects.map((p) => ({
             name: p.name || "",
             description: p.description || "",
@@ -192,15 +227,11 @@ function AdminPage() {
         }),
       });
 
-      console.log("📡 Response status:", res.status, res.statusText);
-
-      // ✅ SAFE JSON parsing
       let data;
       try {
         data = await res.json();
-      } catch (jsonErr) {
-        console.error("❌ JSON parse error:", jsonErr);
-        data = { error: `HTTP ${res.status}: Invalid response format` };
+      } catch {
+        data = { error: `HTTP ${res.status}` };
       }
 
       console.log("📤 Save response:", data);
@@ -209,87 +240,76 @@ function AdminPage() {
         setSaveStatus("Saved ✓");
         setTimeout(() => setSaveStatus(""), 2000);
 
-        if (socketRef.current) {
-          socketRef.current.emit("portfolioUpdated", {
-            username: effectiveUsername,
-            contacts: contactsObj,
-            skills: updatedSkills.filter((s) => s && s.trim() !== ""),
-            projects: updatedProjects,
-            testimonials: updatedTestimonials,
-          });
-        }
+        socketRef.current?.emit("portfolioUpdated", {
+          username: effectiveUsername,
+          contacts: contactsObj,
+          skills: updatedSkills.filter((s) => s?.trim()),
+          projects: updatedProjects,
+          testimonials: updatedTestimonials,
+        });
       } else {
         if (res.status === 401) {
           logout();
           navigate("/login");
           return;
         }
-        console.error("❌ Save failed:", data);
-        alert(`Update failed: ${data.error || `HTTP ${res.status}`}`);
+        alert(`Update failed: ${data.error || "Unknown error"}`);
       }
     } catch (err) {
       console.error("💥 Save error:", err);
-      if (err.name === "AbortError") {
-        alert("Request timeout - please try again");
-      } else {
-        alert(`Update failed: ${err.message}`);
-      }
+      alert(`Save failed: ${err.message}`);
     }
   };
 
-  if (loading)
+  if (loading || !effectiveUsername) {
     return (
       <div style={{ textAlign: "center", padding: "50px" }}>
-        Loading Admin Page...
-      </div>
-    );
-  if (!username && !user?.username) {
-    return (
-      <div style={{ textAlign: "center", padding: "50px" }}>
-        Error: No username available. Redirecting...
+        {loading ? "Loading portfolio..." : "Resolving user..."}
       </div>
     );
   }
 
-  // ===== CONTACTS HANDLERS =====
+  // ===== ALL HANDLERS (UNCHANGED BUT USE effectiveUsername) =====
   const handleAddContact = () => setAddingContact(true);
   const handleContactChange = (field, value) =>
-    setNewContact({ ...newContact, [field]: value });
+    setNewContact((prev) => ({ ...prev, [field]: value }));
+
   const handleNextContact = () => {
-    if (newContact.key.trim() === "" || newContact.value.trim() === "") return;
+    if (!newContact.key?.trim() || !newContact.value?.trim()) return;
     const updated = [...contacts, { ...newContact }];
     setContacts(updated);
     setNewContact({ key: "", value: "" });
     savePortfolio(updated, skills, projects, testimonials);
   };
+
   const handleSaveContact = () => {
-    if (newContact.key.trim() === "" || newContact.value.trim() === "") return;
     handleNextContact();
     setAddingContact(false);
   };
+
   const handleEditContact = (index, field, value) => {
     const updated = [...contacts];
     updated[index][field] = value;
     setContacts(updated);
     savePortfolio(updated, skills, projects, testimonials);
   };
+
   const handleDeleteContact = (index) => {
     const updated = contacts.filter((_, i) => i !== index);
     setContacts(updated);
     savePortfolio(updated, skills, projects, testimonials);
   };
 
-  // ===== SKILLS HANDLERS =====
+  // Skills handlers
   const handleAddSkill = () => setAddingSkill(true);
   const handleNextSkill = () => {
-    if (!newSkill.trim()) return;
+    if (!newSkill?.trim()) return;
     const updated = [...skills, newSkill];
     setSkills(updated);
     setNewSkill("");
     savePortfolio(contacts, updated, projects, testimonials);
   };
   const handleSaveSkill = () => {
-    if (!newSkill.trim()) return;
     handleNextSkill();
     setAddingSkill(false);
   };
@@ -305,7 +325,7 @@ function AdminPage() {
     savePortfolio(contacts, updated, projects, testimonials);
   };
 
-  // ===== PROJECTS HANDLERS =====
+  // Projects handlers
   const handleAddProject = () => setAddingProject(true);
   const handleNextProject = () => {
     const updated = [...projects, { ...newProject }];
@@ -329,7 +349,7 @@ function AdminPage() {
     savePortfolio(contacts, skills, updated, testimonials);
   };
 
-  // ===== TESTIMONIALS HANDLERS =====
+  // Testimonials handlers
   const handleAddTestimonial = () => setAddingTestimonial(true);
   const handleNextTestimonial = () => {
     const updated = [...testimonials, { ...newTestimonial }];
@@ -359,7 +379,7 @@ function AdminPage() {
     savePortfolio(contacts, skills, projects, updated);
   };
 
-  // ===== SKILLS GRID LAYOUT =====
+  // Skills grid
   const skillColumns = [[], []];
   skills.forEach((s, i) => {
     const colIndex = Math.floor((i % 16) / 8);
@@ -369,7 +389,7 @@ function AdminPage() {
   return (
     <div className="admin-container">
       <h1>
-        Admin Page - {username || user?.username}
+        Admin Page - {effectiveUsername}
         {saveStatus && (
           <span style={{ color: "green", marginLeft: "10px" }}>
             ✓ {saveStatus}
@@ -409,13 +429,11 @@ function AdminPage() {
           {contacts.map((c, i) => (
             <li key={i}>
               <input
-                type="text"
                 value={c.key}
                 onChange={(e) => handleEditContact(i, "key", e.target.value)}
                 placeholder="Field name"
               />
               <input
-                type="text"
                 value={c.value}
                 onChange={(e) => handleEditContact(i, "value", e.target.value)}
                 placeholder="Value"
@@ -492,7 +510,7 @@ function AdminPage() {
           <div style={{ marginBottom: "10px" }}>
             <input
               type="text"
-              placeholder="Project Name (optional)"
+              placeholder="Project Name"
               value={newProject.name}
               onChange={(e) =>
                 setNewProject({ ...newProject, name: e.target.value })
@@ -500,7 +518,7 @@ function AdminPage() {
             />
             <input
               type="text"
-              placeholder="Description (optional)"
+              placeholder="Description"
               value={newProject.description}
               onChange={(e) =>
                 setNewProject({ ...newProject, description: e.target.value })
@@ -508,7 +526,7 @@ function AdminPage() {
             />
             <input
               type="text"
-              placeholder="GitHub Link (optional)"
+              placeholder="GitHub Link"
               value={newProject.github}
               onChange={(e) =>
                 setNewProject({ ...newProject, github: e.target.value })
@@ -516,7 +534,7 @@ function AdminPage() {
             />
             <input
               type="text"
-              placeholder="Live Demo Link (optional)"
+              placeholder="Live Demo Link"
               value={newProject.liveDemo}
               onChange={(e) =>
                 setNewProject({ ...newProject, liveDemo: e.target.value })
@@ -532,13 +550,11 @@ function AdminPage() {
           {projects.map((p, i) => (
             <li key={i}>
               <input
-                type="text"
                 value={p.name}
                 onChange={(e) => handleEditProject(i, "name", e.target.value)}
                 placeholder="Project Name"
               />
               <input
-                type="text"
                 value={p.description}
                 onChange={(e) =>
                   handleEditProject(i, "description", e.target.value)
@@ -546,13 +562,11 @@ function AdminPage() {
                 placeholder="Description"
               />
               <input
-                type="text"
                 value={p.github}
                 onChange={(e) => handleEditProject(i, "github", e.target.value)}
                 placeholder="GitHub Link"
               />
               <input
-                type="text"
                 value={p.liveDemo}
                 onChange={(e) =>
                   handleEditProject(i, "liveDemo", e.target.value)
@@ -581,7 +595,7 @@ function AdminPage() {
           <div style={{ marginBottom: "10px" }}>
             <input
               type="text"
-              placeholder="Client Name (optional)"
+              placeholder="Client Name"
               value={newTestimonial.clientName}
               onChange={(e) =>
                 setNewTestimonial({
@@ -591,7 +605,7 @@ function AdminPage() {
               }
             />
             <textarea
-              placeholder="Client Comment (optional)"
+              placeholder="Client Comment"
               value={newTestimonial.comment}
               onChange={(e) =>
                 setNewTestimonial({
@@ -603,7 +617,7 @@ function AdminPage() {
             />
             <input
               type="text"
-              placeholder="Client Position (optional)"
+              placeholder="Client Position"
               value={newTestimonial.position}
               onChange={(e) =>
                 setNewTestimonial({
@@ -614,7 +628,7 @@ function AdminPage() {
             />
             <input
               type="text"
-              placeholder="Client Company (optional)"
+              placeholder="Client Company"
               value={newTestimonial.company}
               onChange={(e) =>
                 setNewTestimonial({
@@ -625,7 +639,7 @@ function AdminPage() {
             />
             <input
               type="text"
-              placeholder="Profile Picture URL (optional)"
+              placeholder="Profile Picture URL"
               value={newTestimonial.profilePicture}
               onChange={(e) =>
                 setNewTestimonial({
@@ -651,7 +665,6 @@ function AdminPage() {
               }}
             >
               <input
-                type="text"
                 value={t.clientName}
                 onChange={(e) =>
                   handleEditTestimonial(i, "clientName", e.target.value)
@@ -667,7 +680,6 @@ function AdminPage() {
                 style={{ width: "100%", minHeight: "60px" }}
               />
               <input
-                type="text"
                 value={t.position}
                 onChange={(e) =>
                   handleEditTestimonial(i, "position", e.target.value)
@@ -675,7 +687,6 @@ function AdminPage() {
                 placeholder="Client Position"
               />
               <input
-                type="text"
                 value={t.company}
                 onChange={(e) =>
                   handleEditTestimonial(i, "company", e.target.value)
@@ -683,7 +694,6 @@ function AdminPage() {
                 placeholder="Client Company"
               />
               <input
-                type="text"
                 value={t.profilePicture}
                 onChange={(e) =>
                   handleEditTestimonial(i, "profilePicture", e.target.value)
