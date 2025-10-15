@@ -1,7 +1,7 @@
 // src/components/AdminPage.js
 import React, { useState, useEffect, useRef } from "react";
+import { useParams } from "react-router-dom"; // ✅ ADDED: Extract username from URL
 import { io } from "socket.io-client";
-import Cookies from "js-cookie";
 import { FiEdit, FiTrash2, FiArrowRight } from "react-icons/fi";
 import "./Admin.css";
 
@@ -12,7 +12,8 @@ const API_URL =
   process.env.REACT_APP_API_URL ||
   "https://portfolio-backend-clinton.onrender.com/api";
 
-function AdminPage({ username }) {
+function AdminPage() {
+  const { username } = useParams(); // ✅ FIXED: Extract username from URL params
   const [contacts, setContacts] = useState([]);
   const [skills, setSkills] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -47,11 +48,21 @@ function AdminPage({ username }) {
 
   const socketRef = useRef(null);
 
-  // Fetch portfolio and subscribe to socket updates
+  // ✅ FIXED: Add username validation and use credentials
   useEffect(() => {
+    if (!username) {
+      console.error("❌ No username provided - cannot load portfolio");
+      setLoading(false);
+      return;
+    }
+
+    console.log("🔍 Loading portfolio for username:", username);
+
     const fetchPortfolio = async () => {
       try {
-        const res = await fetch(`${API_URL}/portfolio/${username}`);
+        const res = await fetch(`${API_URL}/portfolio/${username}`, {
+          credentials: "include", // ✅ FIXED: Use cookies for authentication
+        });
         const data = await res.json();
 
         const contactArray = data.contacts
@@ -75,7 +86,7 @@ function AdminPage({ username }) {
 
     socketRef.current = io(SOCKET_URL, {
       transports: ["websocket"],
-      withCredentials: true,
+      withCredentials: true, // ✅ FIXED: Use cookies for socket auth
     });
     socketRef.current.emit("joinPortfolioRoom", username);
 
@@ -94,18 +105,25 @@ function AdminPage({ username }) {
       }
     );
 
-    return () => socketRef.current.disconnect();
-  }, [username]);
+    return () => socketRef.current?.disconnect();
+  }, [username]); // ✅ FIXED: Add username dependency
 
-  // Save portfolio function
+  // ✅ FIXED: Save portfolio function with proper auth and username validation
   const savePortfolio = async (
     updatedContacts,
     updatedSkills,
     updatedProjects,
     updatedTestimonials
   ) => {
+    if (!username) {
+      console.error("❌ Cannot save - username is undefined");
+      alert("Error: Username not available");
+      return;
+    }
+
     try {
-      const token = Cookies.get("token");
+      console.log("💾 Saving portfolio for:", username);
+
       const contactsObj = {};
       updatedContacts.forEach((c) => {
         if (c.key && c.key.trim() !== "" && c.value && c.value.trim() !== "") {
@@ -117,8 +135,9 @@ function AdminPage({ username }) {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          // ✅ FIXED: REMOVED Authorization header - use httpOnly cookie instead
         },
+        credentials: "include", // ✅ FIXED: Use httpOnly cookie for authentication
         body: JSON.stringify({
           contacts: contactsObj,
           skills: updatedSkills.filter((s) => s && s.trim() !== ""),
@@ -137,10 +156,11 @@ function AdminPage({ username }) {
             profilePicture: t.profilePicture || "",
           })),
         }),
-        credentials: "include",
       });
 
       const data = await res.json();
+      console.log("📤 Save response:", data);
+
       if (res.ok) {
         setSaveStatus("Saved");
         setTimeout(() => setSaveStatus(""), 2000);
@@ -153,7 +173,7 @@ function AdminPage({ username }) {
           testimonials: updatedTestimonials,
         });
       } else {
-        alert("Update failed: " + data.error);
+        alert("Update failed: " + (data.error || "Unknown error"));
       }
     } catch (err) {
       console.error("Error saving portfolio:", err);
@@ -162,6 +182,7 @@ function AdminPage({ username }) {
   };
 
   if (loading) return <p>Loading Admin Page...</p>;
+  if (!username) return <p>Error: No username provided</p>; // ✅ FIXED: Handle missing username
 
   // ===== CONTACTS =====
   const handleAddContact = () => setAddingContact(true);
