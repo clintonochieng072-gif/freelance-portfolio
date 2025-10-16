@@ -3,6 +3,29 @@ const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const Portfolio = require("../models/Portfolio");
 
+// ✅ NEW ROOT ROUTE - Get authenticated user's portfolio (matches frontend /api/portfolio)
+router.get("/", authMiddleware, async (req, res) => {
+  try {
+    console.log("📡 Fetching portfolio for user:", req.user.username);
+
+    const portfolio = await Portfolio.findOne({
+      username: req.user.username.toLowerCase(),
+    });
+
+    if (!portfolio) {
+      return res.status(404).json({
+        error: "Portfolio not found. Create one first.",
+      });
+    }
+
+    console.log("✅ Portfolio found for:", req.user.username);
+    res.json(portfolio);
+  } catch (err) {
+    console.error("Error fetching user portfolio:", err);
+    res.status(500).json({ error: "Error fetching portfolio" });
+  }
+});
+
 // Get portfolio by username (Public route)
 router.get("/:username", async (req, res) => {
   try {
@@ -23,7 +46,7 @@ router.get("/:username", async (req, res) => {
   }
 });
 
-// Get client's own portfolio (Protected)
+// Get client's own portfolio (Protected) - Keep for /api/portfolio/me/portfolio
 router.get("/me/portfolio", authMiddleware, async (req, res) => {
   try {
     const portfolio = await Portfolio.findOne({ username: req.user.username });
