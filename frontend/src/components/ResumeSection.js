@@ -1,50 +1,51 @@
-// frontend/src/components/ResumeSection.js
 import React from "react";
 
-const ResumeSection = ({ isAdmin, portfolio, updatePortfolio }) => {
-  const handleResumeChange = (e) => {
-    if (isAdmin && updatePortfolio) {
-      updatePortfolio({ resumeUrl: e.target.value });
-    }
-  };
+function ResumeSection({ isAdmin, portfolio, onChange, onFileChange }) {
+  if (isAdmin) {
+    return (
+      <div className="resume-section">
+        <input
+          type="url"
+          placeholder="Resume URL (optional, e.g., https://example.com/resume.pdf)"
+          value={portfolio.resumeUrl || ""}
+          onChange={(e) => onChange("resumeUrl", e.target.value)}
+          style={{ width: "100%", margin: "5px 0" }}
+        />
+        <input
+          type="file"
+          accept=".pdf"
+          onChange={onFileChange}
+          style={{ margin: "5px 0" }}
+        />
+        {portfolio.resumeUrl && (
+          <p>
+            <a
+              href={portfolio.resumeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Preview Uploaded Resume
+            </a>
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Optional in public view
+  if (!portfolio?.resumeUrl || portfolio.resumeUrl.trim() === "") {
+    return null;
+  }
 
   return (
-    <section className="section resume-section">
-      <h2>Resume</h2>
-      {isAdmin ? (
-        <div>
-          <label htmlFor="resumeUrl">Resume URL:</label>
-          <input
-            type="text"
-            id="resumeUrl"
-            value={portfolio.resumeUrl || ""}
-            onChange={handleResumeChange}
-            placeholder="Enter resume URL (e.g., https://example.com/resume.pdf)"
-            style={{ width: "100%", padding: "10px", marginTop: "5px" }}
-          />
-        </div>
-      ) : portfolio.resumeUrl && portfolio.resumeUrl.trim() !== "" ? (
-        <a
-          href={portfolio.resumeUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="resume-link"
-          style={{
-            display: "inline-block",
-            padding: "10px 20px",
-            background: "#007bff",
-            color: "white",
-            textDecoration: "none",
-            borderRadius: "5px",
-          }}
-        >
-          Download Resume
+    <div className="resume-section">
+      <p>
+        <a href={portfolio.resumeUrl} target="_blank" rel="noopener noreferrer">
+          View Resume
         </a>
-      ) : (
-        <p>No resume available.</p>
-      )}
-    </section>
+      </p>
+    </div>
   );
-};
+}
 
 export default ResumeSection;

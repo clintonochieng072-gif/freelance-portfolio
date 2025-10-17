@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { io } from "socket.io-client";
+import { jsPDF } from "jspdf";
 import IntroductionSection from "./IntroductionSection";
 import AboutSection from "./AboutSection";
 import ProfilePictureSection from "./ProfilePictureSection";
@@ -105,6 +106,132 @@ function HomePage() {
       socket.disconnect();
     };
   }, [username, fetchPortfolio]);
+
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    let yOffset = 10;
+
+    // Full Name
+    if (portfolio.displayName && portfolio.displayName.trim() !== "") {
+      doc.setFontSize(20);
+      doc.text(portfolio.displayName, 10, yOffset);
+      yOffset += 10;
+    }
+
+    // Title
+    if (portfolio.title && portfolio.title.trim() !== "") {
+      doc.setFontSize(14);
+      doc.text(portfolio.title, 10, yOffset);
+      yOffset += 10;
+    }
+
+    // About
+    if (portfolio.bio && portfolio.bio.trim() !== "") {
+      doc.setFontSize(12);
+      doc.text("About:", 10, yOffset);
+      yOffset += 6;
+      doc.text(portfolio.bio, 10, yOffset, { maxWidth: 190 });
+      yOffset += doc.splitTextToSize(portfolio.bio, 190).length * 6 + 10;
+    }
+
+    // Resume
+    if (portfolio.resumeUrl && portfolio.resumeUrl.trim() !== "") {
+      doc.setFontSize(12);
+      doc.text("Resume:", 10, yOffset);
+      yOffset += 6;
+      doc.text(portfolio.resumeUrl, 10, yOffset, { maxWidth: 190 });
+      yOffset += 10;
+    }
+
+    // Contacts
+    if (portfolio.contacts && Object.keys(portfolio.contacts).length > 0) {
+      doc.setFontSize(12);
+      doc.text("Contacts:", 10, yOffset);
+      yOffset += 6;
+      Object.entries(portfolio.contacts).forEach(([key, value]) => {
+        if (value && value.trim() !== "") {
+          doc.text(`${key}: ${value}`, 10, yOffset);
+          yOffset += 6;
+        }
+      });
+      yOffset += 10;
+    }
+
+    // Skills
+    if (portfolio.skills && portfolio.skills.length > 0) {
+      doc.setFontSize(12);
+      doc.text("Skills:", 10, yOffset);
+      yOffset += 6;
+      portfolio.skills.forEach((skill) => {
+        if (skill && skill.trim() !== "") {
+          doc.text(`- ${skill}`, 10, yOffset);
+          yOffset += 6;
+        }
+      });
+      yOffset += 10;
+    }
+
+    // Projects
+    if (portfolio.projects && portfolio.projects.length > 0) {
+      doc.setFontSize(12);
+      doc.text("Projects:", 10, yOffset);
+      yOffset += 6;
+      portfolio.projects.forEach((project) => {
+        if (project.name && project.name.trim() !== "") {
+          doc.text(project.name, 10, yOffset);
+          yOffset += 6;
+          if (project.description && project.description.trim() !== "") {
+            doc.text(project.description, 15, yOffset, { maxWidth: 180 });
+            yOffset += doc.splitTextToSize(project.description, 180).length * 6;
+          }
+          if (project.github && project.github.trim() !== "") {
+            doc.text(`GitHub: ${project.github}`, 15, yOffset);
+            yOffset += 6;
+          }
+          if (project.liveDemo && project.liveDemo.trim() !== "") {
+            doc.text(`Live Demo: ${project.liveDemo}`, 15, yOffset);
+            yOffset += 6;
+          }
+          yOffset += 5;
+        }
+      });
+      yOffset += 10;
+    }
+
+    // Testimonials
+    if (portfolio.testimonials && portfolio.testimonials.length > 0) {
+      doc.setFontSize(12);
+      doc.text("Testimonials:", 10, yOffset);
+      yOffset += 6;
+      portfolio.testimonials.forEach((t) => {
+        if (t.clientName && t.clientName.trim() !== "") {
+          const positionCompany = [
+            t.position && t.position.trim() !== "" ? t.position : "",
+            t.company && t.company.trim() !== "" ? t.company : "",
+          ]
+            .filter(Boolean)
+            .join(", ");
+          doc.text(
+            `${t.clientName}${positionCompany ? ` (${positionCompany})` : ""}`,
+            10,
+            yOffset
+          );
+          yOffset += 6;
+          if (t.comment && t.comment.trim() !== "") {
+            doc.text(t.comment, 15, yOffset, { maxWidth: 180 });
+            yOffset += doc.splitTextToSize(t.comment, 180).length * 6;
+          }
+          yOffset += 5;
+        }
+      });
+    }
+
+    // Footer
+    doc.setFontSize(10);
+    doc.text("Powered by PortfolioPro", 10, yOffset);
+
+    doc.save(`${portfolio.displayName || username}_portfolio.pdf`);
+  };
 
   if (loading) {
     return (
@@ -315,6 +442,25 @@ function HomePage() {
           </div>
         </section>
       )}
+
+      {/* Download Portfolio Button */}
+      <section className="section">
+        <button
+          onClick={handleDownloadPDF}
+          className="download-btn"
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "#007bff",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            marginTop: "20px",
+          }}
+        >
+          Download Portfolio as PDF
+        </button>
+      </section>
 
       <footer className="portfolio-footer">
         <p>Powered by PortfolioPro</p>

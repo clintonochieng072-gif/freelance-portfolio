@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
-import { FiTrash2 } from "react-icons/fi";
+import { FiTrash2, FiArrowRight } from "react-icons/fi";
 import { useGlobalContext } from "../context/GlobalContext";
 import IntroductionSection from "./IntroductionSection";
 import AboutSection from "./AboutSection";
@@ -35,7 +35,8 @@ function AdminPage() {
   const [bio, setBio] = useState("");
   const [profilePicture, setProfilePicture] = useState(null); // File object
   const [profilePictureUrl, setProfilePictureUrl] = useState(""); // URL for preview
-  const [resumeUrl, setResumeUrl] = useState("");
+  const [resumeFile, setResumeFile] = useState(null); // File object
+  const [resumeUrl, setResumeUrl] = useState(""); // URL for preview or link
   const [theme, setTheme] = useState("light");
   const [isPublished, setIsPublished] = useState(false);
 
@@ -161,12 +162,20 @@ function AdminPage() {
     }
   }, [effectiveUsername, logout, navigate]);
 
-  // Handle file upload
+  // Handle file uploads
   const handleProfilePictureChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setProfilePicture(file);
-      setProfilePictureUrl(URL.createObjectURL(file)); // Preview
+      setProfilePictureUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleResumeFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setResumeFile(file);
+      setResumeUrl(URL.createObjectURL(file)); // Temporary preview
     }
   };
 
@@ -182,14 +191,18 @@ function AdminPage() {
       );
       formData.append("projects", JSON.stringify(projects));
       formData.append("testimonials", JSON.stringify(testimonials));
-      formData.append("displayName", displayName);
-      formData.append("title", title);
-      formData.append("bio", bio);
-      formData.append("resumeUrl", resumeUrl);
+      formData.append("displayName", displayName || "");
+      formData.append("title", title || "");
+      formData.append("bio", bio || "");
       formData.append("theme", theme);
       formData.append("isPublished", isPublished);
       if (profilePicture) {
         formData.append("profilePicture", profilePicture);
+      }
+      if (resumeFile) {
+        formData.append("resumeFile", resumeFile);
+      } else {
+        formData.append("resumeUrl", resumeUrl || "");
       }
 
       const res = await fetch(`${API_URL}/portfolio/update`, {
@@ -205,7 +218,8 @@ function AdminPage() {
           navigate("/login");
           return;
         }
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        const errorData = await res.json();
+        throw new Error(errorData.error || `HTTP ${res.status}`);
       }
 
       const data = await res.json();
@@ -214,13 +228,17 @@ function AdminPage() {
       setTimeout(() => setSaveStatus(""), 2000);
       setError("");
 
+      // Update states with backend response to prevent data loss
+      setProfilePictureUrl(data.portfolio.profilePicture || profilePictureUrl);
+      setResumeUrl(data.portfolio.resumeUrl || resumeUrl);
+      setProjects(data.portfolio.projects || projects);
       socketRef.current?.emit("portfolioUpdated", {
         username: effectiveUsername,
         portfolio: data.portfolio,
       });
     } catch (err) {
       console.error("💥 Save error:", err);
-      setError("Failed to save portfolio");
+      setError(`Failed to save portfolio: ${err.message}`);
       setSaveStatus("");
     }
   };
@@ -250,12 +268,17 @@ function AdminPage() {
   const handleContactChange = (field, value) =>
     setNewContact((prev) => ({ ...prev, [field]: value }));
 
-  const handleSaveContact = () => {
+  const handleNextContact = () => {
     if (newContact.key?.trim() && newContact.value?.trim()) {
       setContacts({ ...contacts, [newContact.key]: newContact.value });
       setNewContact({ key: "", value: "" });
-      setAddingContact(false);
     }
+  };
+
+  const handleSaveContact = () => {
+    handleNextContact();
+    setAddingContact(false);
+    savePortfolio();
   };
 
   const handleEditContact = (key, value) => {
@@ -270,12 +293,17 @@ function AdminPage() {
 
   // Skills handlers
   const handleAddSkill = () => setAddingSkill(true);
-  const handleSaveSkill = () => {
+  const handleNextSkill = () => {
     if (newSkill?.trim()) {
       setSkills([...skills, newSkill]);
       setNewSkill("");
-      setAddingSkill(false);
     }
+  };
+
+  const handleSaveSkill = () => {
+    handleNextSkill();
+    setAddingSkill(false);
+    savePortfolio();
   };
 
   const handleEditSkill = (index, value) => {
@@ -290,7 +318,7 @@ function AdminPage() {
 
   // Projects handlers
   const handleAddProject = () => setAddingProject(true);
-  const handleSaveProject = () => {
+  const handleNextProject = () => {
     if (
       newProject.name?.trim() ||
       newProject.description?.trim() ||
@@ -299,8 +327,13 @@ function AdminPage() {
     ) {
       setProjects([...projects, newProject]);
       setNewProject({ name: "", description: "", github: "", liveDemo: "" });
-      setAddingProject(false);
     }
+  };
+
+  const handleSaveProject = () => {
+    handleNextProject();
+    setAddingProject(false);
+    savePortfolio();
   };
 
   const handleEditProject = (index, field, value) => {
@@ -315,7 +348,7 @@ function AdminPage() {
 
   // Testimonials handlers
   const handleAddTestimonial = () => setAddingTestimonial(true);
-  const handleSaveTestimonial = () => {
+  const handleNextTestimonial = () => {
     if (
       newTestimonial.clientName?.trim() ||
       newTestimonial.comment?.trim() ||
@@ -331,8 +364,13 @@ function AdminPage() {
         company: "",
         profilePicture: "",
       });
-      setAddingTestimonial(false);
     }
+  };
+
+  const handleSaveTestimonial = () => {
+    handleNextTestimonial();
+    setAddingTestimonial(false);
+    savePortfolio();
   };
 
   const handleEditTestimonial = (index, field, value) => {
@@ -432,8 +470,9 @@ function AdminPage() {
         />
         <ResumeSection
           isAdmin={true}
-          portfolio={{ resumeUrl }}
+          portfolio={{ resumeUrl, resumeFile }}
           onChange={handleProfileChange}
+          onFileChange={handleResumeFileChange}
         />
         <div>
           <h3>Theme</h3>
@@ -486,6 +525,9 @@ function AdminPage() {
               onChange={(e) => handleContactChange("value", e.target.value)}
               style={{ flex: "1", minWidth: "200px" }}
             />
+            <button className="next-btn" onClick={handleNextContact}>
+              <FiArrowRight /> Next
+            </button>
             <button className="ok-btn" onClick={handleSaveContact}>
               OK
             </button>
@@ -567,6 +609,9 @@ function AdminPage() {
               onChange={(e) => setNewSkill(e.target.value)}
               style={{ flex: 1 }}
             />
+            <button className="next-btn" onClick={handleNextSkill}>
+              <FiArrowRight /> Next
+            </button>
             <button className="ok-btn" onClick={handleSaveSkill}>
               OK
             </button>
@@ -647,9 +692,14 @@ function AdminPage() {
               }
               style={{ width: "100%", margin: "5px 0" }}
             />
-            <button className="ok-btn" onClick={handleSaveProject}>
-              OK
-            </button>
+            <div style={{ marginTop: "10px" }}>
+              <button className="next-btn" onClick={handleNextProject}>
+                <FiArrowRight /> Next
+              </button>
+              <button className="ok-btn" onClick={handleSaveProject}>
+                OK
+              </button>
+            </div>
           </div>
         )}
         <ul style={{ listStyle: "none", padding: 0 }}>
@@ -777,9 +827,14 @@ function AdminPage() {
               }
               style={{ width: "100%", margin: "5px 0" }}
             />
-            <button className="ok-btn" onClick={handleSaveTestimonial}>
-              OK
-            </button>
+            <div style={{ marginTop: "10px" }}>
+              <button className="next-btn" onClick={handleNextTestimonial}>
+                <FiArrowRight /> Next
+              </button>
+              <button className="ok-btn" onClick={handleSaveTestimonial}>
+                OK
+              </button>
+            </div>
           </div>
         )}
         <ul style={{ listStyle: "none", padding: 0 }}>
