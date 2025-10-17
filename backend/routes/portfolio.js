@@ -21,8 +21,14 @@ router.get("/", authMiddleware, async (req, res) => {
       });
     }
 
+    // Compute introduction dynamically
+    const introduction =
+      portfolio.displayName && portfolio.occupation
+        ? `Hi, I'm ${portfolio.displayName} — ${portfolio.occupation}`
+        : "Welcome to my portfolio!";
+
     console.log("✅ Portfolio found for:", req.user.username);
-    res.json(portfolio);
+    res.json({ ...portfolio.toObject(), introduction });
   } catch (err) {
     console.error("Error fetching user portfolio:", err);
     res.status(500).json({ error: "Error fetching portfolio" });
@@ -56,13 +62,23 @@ router.get("/:username", async (req, res) => {
       });
     }
 
+    // Compute introduction dynamically
+    const introduction =
+      portfolio.displayName && portfolio.occupation
+        ? `Hi, I'm ${portfolio.displayName} — ${portfolio.occupation}`
+        : "Welcome to my portfolio!";
+
     // Ensure portfolio has safe default structure
     const safePortfolio = {
       ...portfolio.toObject(),
+      introduction,
       contacts: portfolio.contacts || {},
       skills: portfolio.skills || [],
       projects: portfolio.projects || [],
       testimonials: portfolio.testimonials || [],
+      about: portfolio.about || "",
+      profilePicture: portfolio.profilePicture || "",
+      resumeUrl: portfolio.resumeUrl || "",
     };
 
     console.log(`✅ Public portfolio served: ${username}`);
@@ -82,7 +98,13 @@ router.get("/me/portfolio", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "Portfolio not found" });
     }
 
-    res.json(portfolio);
+    // Compute introduction dynamically
+    const introduction =
+      portfolio.displayName && portfolio.occupation
+        ? `Hi, I'm ${portfolio.displayName} — ${portfolio.occupation}`
+        : "Welcome to my portfolio!";
+
+    res.json({ ...portfolio.toObject(), introduction });
   } catch (err) {
     console.error("Error fetching portfolio:", err);
     res.status(500).json({ error: "Error fetching portfolio" });
@@ -101,7 +123,11 @@ router.put("/update", authMiddleware, async (req, res) => {
       title,
       bio,
       theme,
-      isPublished, // Allow publishing/unpublishing
+      isPublished,
+      occupation, // New field
+      about, // New field
+      profilePicture, // New field
+      resumeUrl, // New field
     } = req.body;
 
     let portfolio = await Portfolio.findOne({ username: req.user.username });
@@ -121,26 +147,52 @@ router.put("/update", authMiddleware, async (req, res) => {
     if (bio !== undefined) portfolio.bio = bio;
     if (theme !== undefined) portfolio.theme = theme;
     if (isPublished !== undefined) portfolio.isPublished = isPublished;
+    if (occupation !== undefined) portfolio.occupation = occupation || "";
+    if (about !== undefined) portfolio.about = about || "";
+    if (profilePicture !== undefined)
+      portfolio.profilePicture = profilePicture || "";
+    if (resumeUrl !== undefined) portfolio.resumeUrl = resumeUrl || "";
 
     const savedPortfolio = await portfolio.save();
+
+    // Compute introduction for response
+    const introduction =
+      savedPortfolio.displayName && savedPortfolio.occupation
+        ? `Hi, I'm ${savedPortfolio.displayName} — ${savedPortfolio.occupation}`
+        : "Welcome to my portfolio!";
 
     // Emit socket event for real-time updates
     const io = req.app.get("io");
     if (io) {
       io.to(req.user.username.toLowerCase()).emit("portfolioUpdated", {
         username: req.user.username,
-        portfolio: savedPortfolio,
+        portfolio: { ...savedPortfolio.toObject(), introduction },
       });
       console.log(`📡 Emitted portfolio update for: ${req.user.username}`);
     }
 
     res.json({
       message: "Portfolio updated successfully",
-      portfolio: savedPortfolio,
+      portfolio: { ...savedPortfolio.toObject(), introduction },
     });
   } catch (err) {
     console.error("Error updating portfolio:", err);
     res.status(500).json({ error: "Error updating portfolio" });
+  }
+});
+
+// Placeholder image upload endpoint (replace with real storage service)
+router.post("/upload-image", authMiddleware, async (req, res) => {
+  try {
+    // For now, return placeholder URL - replace with actual upload logic
+    const imageUrl =
+      req.body.imageUrl ||
+      "https://via.placeholder.com/150x150/007bff/ffffff?text=Profile";
+    console.log(`📤 Image upload requested for user: ${req.user.username}`);
+    res.json({ imageUrl });
+  } catch (err) {
+    console.error("Error handling image upload:", err);
+    res.status(500).json({ error: "Error uploading image" });
   }
 });
 

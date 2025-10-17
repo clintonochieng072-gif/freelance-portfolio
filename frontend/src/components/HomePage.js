@@ -1,7 +1,10 @@
-// src/components/HomePage.js
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { io } from "socket.io-client";
+import IntroductionSection from "./IntroductionSection";
+import AboutSection from "./AboutSection";
+import ProfilePictureSection from "./ProfilePictureSection";
+import ResumeSection from "./ResumeSection";
 import "../App.css";
 
 const SOCKET_URL =
@@ -54,6 +57,15 @@ function HomePage() {
   }, [username]);
 
   useEffect(() => {
+    // Support preview mode
+    const previewData = localStorage.getItem("previewPortfolio");
+    if (previewData && window.location.search.includes("preview=true")) {
+      setPortfolio(JSON.parse(previewData));
+      setLoading(false);
+      localStorage.removeItem("previewPortfolio");
+      return;
+    }
+
     fetchPortfolio();
 
     // Socket setup with Render-friendly configuration
@@ -146,17 +158,30 @@ function HomePage() {
 
   return (
     <div className={`App ${portfolio.theme === "dark" ? "dark-mode" : ""}`}>
-      <header className="portfolio-header">
-        <h1>
-          {portfolio.displayName || portfolio.username || username}'s Portfolio
-        </h1>
-        {portfolio.title && (
-          <p className="portfolio-title">{portfolio.title}</p>
-        )}
-        {portfolio.bio && <p className="portfolio-bio">{portfolio.bio}</p>}
+      <IntroductionSection isAdmin={false} portfolio={portfolio} />
+
+      <header
+        className="portfolio-header"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "20px",
+          marginBottom: "40px",
+        }}
+      >
+        <ProfilePictureSection isAdmin={false} portfolio={portfolio} />
+        <div>
+          <h1>{portfolio.displayName || portfolio.username || "Portfolio"}</h1>
+          {portfolio.title && (
+            <p className="portfolio-title">{portfolio.title}</p>
+          )}
+          {portfolio.bio && <p className="portfolio-bio">{portfolio.bio}</p>}
+          <AboutSection isAdmin={false} portfolio={portfolio} />
+        </div>
       </header>
 
-      {/* Contacts */}
+      <ResumeSection isAdmin={false} portfolio={portfolio} />
+
       {Object.keys(safeContacts).length > 0 && (
         <section className="section">
           <h2>Contact Information</h2>
@@ -170,7 +195,6 @@ function HomePage() {
         </section>
       )}
 
-      {/* Skills */}
       {safeSkills.length > 0 && (
         <section className="section">
           <h2>Skills & Expertise</h2>
@@ -184,7 +208,6 @@ function HomePage() {
         </section>
       )}
 
-      {/* Projects */}
       {safeProjects.length > 0 && (
         <section className="section">
           <h2>Projects</h2>
@@ -221,7 +244,6 @@ function HomePage() {
         </section>
       )}
 
-      {/* Testimonials */}
       {safeTestimonials.length > 0 && (
         <section className="section">
           <h2>Client Testimonials</h2>

@@ -46,6 +46,10 @@ const PortfolioSchema = new mongoose.Schema(
       default: "light",
     },
     isPublished: { type: Boolean, default: true },
+    occupation: { type: String, default: "" }, // New field for occupation
+    about: { type: String, default: "" }, // New field for about section
+    profilePicture: { type: String, default: "" }, // New field for profile picture URL
+    resumeUrl: { type: String, default: "" }, // New field for resume URL
   },
   {
     timestamps: true,
