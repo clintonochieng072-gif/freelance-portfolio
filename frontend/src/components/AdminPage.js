@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
-import { FiTrash2, FiArrowRight } from "react-icons/fi";
+import { FiTrash2 } from "react-icons/fi";
 import { useGlobalContext } from "../context/GlobalContext";
 import IntroductionSection from "./IntroductionSection";
 import AboutSection from "./AboutSection";
@@ -23,17 +23,21 @@ function AdminPage() {
   const [effectiveUsername, setEffectiveUsername] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("");
+  const [error, setError] = useState("");
 
-  // Data states
-  const [contacts, setContacts] = useState([]);
+  // Portfolio states
+  const [contacts, setContacts] = useState({});
   const [skills, setSkills] = useState([]);
   const [projects, setProjects] = useState([]);
   const [testimonials, setTestimonials] = useState([]);
   const [displayName, setDisplayName] = useState("");
-  const [occupation, setOccupation] = useState("");
-  const [about, setAbout] = useState("");
-  const [profilePicture, setProfilePicture] = useState("");
+  const [title, setTitle] = useState("");
+  const [bio, setBio] = useState("");
+  const [profilePicture, setProfilePicture] = useState(null); // File object
+  const [profilePictureUrl, setProfilePictureUrl] = useState(""); // URL for preview
   const [resumeUrl, setResumeUrl] = useState("");
+  const [theme, setTheme] = useState("light");
+  const [isPublished, setIsPublished] = useState(false);
 
   // Form states
   const [newContact, setNewContact] = useState({ key: "", value: "" });
@@ -58,65 +62,32 @@ function AdminPage() {
 
   const socketRef = useRef(null);
 
-  // Preview handler
-  const handlePreview = () => {
-    const portfolio = {
-      username: effectiveUsername,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl,
-      contacts: Object.fromEntries(
-        contacts.map(({ key, value }) => [key, value])
-      ),
-      skills,
-      projects,
-      testimonials,
-      introduction:
-        displayName && occupation
-          ? `Hi, I'm ${displayName} — ${occupation}`
-          : "Welcome to my portfolio!",
-    };
-    localStorage.setItem("previewPortfolio", JSON.stringify(portfolio));
-    window.open(`/portfolio/${effectiveUsername}?preview=true`, "_blank");
-  };
-
-  // DISPLAY ONLY: Resolve username for UI and socket room
+  // Fetch portfolio
   useEffect(() => {
     const resolveUsername = () => {
-      console.log("🔍 Resolving display username...");
-      console.log("   - URL param:", urlUsername);
-      console.log("   - Context user:", user?.username);
-
-      let usernameToUse = null;
-
-      if (urlUsername && urlUsername !== "undefined") {
-        usernameToUse = urlUsername;
-        console.log("✅ Using URL param for display:", usernameToUse);
-      } else if (user?.username) {
-        usernameToUse = user.username;
-        console.log("✅ Using context user for display:", usernameToUse);
+      console.log("🔍 Resolving username...");
+      let usernameToUse = urlUsername || user?.username;
+      if (usernameToUse && usernameToUse !== "undefined") {
+        setEffectiveUsername(usernameToUse.toLowerCase());
+        console.log("✅ Username set:", usernameToUse);
+      } else {
+        setError("No user specified");
+        setLoading(false);
       }
-
-      console.log("🎯 Display username:", usernameToUse);
-      setEffectiveUsername(usernameToUse);
     };
 
     resolveUsername();
   }, [urlUsername, user]);
 
-  // Fetch portfolio
   useEffect(() => {
     const fetchPortfolio = async () => {
-      try {
-        console.log("📡 Loading user portfolio via auth cookie...");
+      if (!effectiveUsername) return;
 
-        const res = await fetch(`${API_URL}/portfolio`, {
+      try {
+        console.log("📡 Fetching portfolio for:", effectiveUsername);
+        const res = await fetch(`${API_URL}/portfolio/me/portfolio`, {
           credentials: "include",
         });
-
-        console.log("📡 Portfolio fetch status:", res.status);
 
         if (!res.ok) {
           if (res.status === 401) {
@@ -129,93 +100,60 @@ function AdminPage() {
         }
 
         const data = await res.json();
-        console.log("✅ Portfolio loaded:", Object.keys(data).length, "items");
-
-        // Process contacts as array
-        const contactArray = data.contacts
-          ? Object.entries(data.contacts)
-              .filter(([key, value]) => value && value.trim() !== "")
-              .map(([key, value]) => ({ key, value }))
-          : [];
-
-        setContacts(contactArray);
+        console.log("✅ Portfolio loaded:", data);
+        setContacts(data.contacts || {});
         setSkills(data.skills || []);
         setProjects(data.projects || []);
         setTestimonials(data.testimonials || []);
         setDisplayName(data.displayName || "");
-        setOccupation(data.occupation || "");
-        setAbout(data.about || "");
-        setProfilePicture(data.profilePicture || "");
+        setTitle(data.title || "");
+        setBio(data.bio || "");
+        setProfilePictureUrl(data.profilePicture || "");
         setResumeUrl(data.resumeUrl || "");
+        setTheme(data.theme || "light");
+        setIsPublished(data.isPublished || false);
         setLoading(false);
       } catch (err) {
-        console.error("💥 Portfolio fetch error:", err);
-
-        // Fallback: try with username if available
-        if (effectiveUsername) {
-          try {
-            console.log("🔄 Fallback: trying with username...");
-            const fallbackRes = await fetch(
-              `${API_URL}/portfolio/${effectiveUsername}`,
-              {
-                credentials: "include",
-              }
-            );
-            if (fallbackRes.ok) {
-              const data = await fallbackRes.json();
-              const contactArray = data.contacts
-                ? Object.entries(data.contacts)
-                    .filter(([key, value]) => value && value.trim() !== "")
-                    .map(([key, value]) => ({ key, value }))
-                : [];
-              setContacts(contactArray);
-              setSkills(data.skills || []);
-              setProjects(data.projects || []);
-              setTestimonials(data.testimonials || []);
-              setDisplayName(data.displayName || "");
-              setOccupation(data.occupation || "");
-              setAbout(data.about || "");
-              setProfilePicture(data.profilePicture || "");
-              setResumeUrl(data.resumeUrl || "");
-              setLoading(false);
-              return;
-            }
-          } catch (fallbackErr) {
-            console.error("Fallback fetch failed:", fallbackErr);
-          }
-        }
-
+        console.error("💥 Fetch error:", err);
+        setError("Failed to load portfolio");
         setLoading(false);
-        alert("Failed to load portfolio data. Please try refreshing.");
       }
     };
 
-    fetchPortfolio();
-
-    // Socket setup
     if (effectiveUsername) {
+      fetchPortfolio();
+
       socketRef.current = io(SOCKET_URL, {
-        transports: ["websocket"],
+        transports: ["polling", "websocket"],
         withCredentials: true,
+        timeout: 10000,
+        reconnection: true,
+        reconnectionAttempts: 5,
       });
-      socketRef.current.emit("joinPortfolioRoom", effectiveUsername);
+
+      socketRef.current.on("connect", () => {
+        console.log("🔌 Socket connected:", socketRef.current.id);
+        socketRef.current.emit("joinPortfolioRoom", effectiveUsername);
+      });
+
+      socketRef.current.on("connect_error", (err) => {
+        console.warn("⚠️ Socket error:", err.message);
+      });
 
       socketRef.current.on("portfolioUpdated", ({ portfolio }) => {
-        if (portfolio) {
-          const contactArray = portfolio.contacts
-            ? Object.entries(portfolio.contacts)
-                .filter(([key, value]) => value && value.trim() !== "")
-                .map(([key, value]) => ({ key, value }))
-            : [];
-          setContacts(contactArray);
+        if (portfolio?.username === effectiveUsername) {
+          console.log("🔄 Portfolio updated via socket");
+          setContacts(portfolio.contacts || {});
           setSkills(portfolio.skills || []);
           setProjects(portfolio.projects || []);
           setTestimonials(portfolio.testimonials || []);
           setDisplayName(portfolio.displayName || "");
-          setOccupation(portfolio.occupation || "");
-          setAbout(portfolio.about || "");
-          setProfilePicture(portfolio.profilePicture || "");
+          setTitle(portfolio.title || "");
+          setBio(portfolio.bio || "");
+          setProfilePictureUrl(portfolio.profilePicture || "");
           setResumeUrl(portfolio.resumeUrl || "");
+          setTheme(portfolio.theme || "light");
+          setIsPublished(portfolio.isPublished || false);
         }
       });
 
@@ -223,364 +161,201 @@ function AdminPage() {
     }
   }, [effectiveUsername, logout, navigate]);
 
+  // Handle file upload
+  const handleProfilePictureChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfilePicture(file);
+      setProfilePictureUrl(URL.createObjectURL(file)); // Preview
+    }
+  };
+
   // Save portfolio
-  const savePortfolio = async (
-    updatedContacts,
-    updatedSkills,
-    updatedProjects,
-    updatedTestimonials,
-    updatedDisplayName,
-    updatedOccupation,
-    updatedAbout,
-    updatedProfilePicture,
-    updatedResumeUrl
-  ) => {
+  const savePortfolio = async () => {
     try {
-      console.log("💾 Saving portfolio via auth cookie...");
-
-      const contactsObj = {};
-      updatedContacts.forEach((c) => {
-        if (c.key?.trim() && c.value?.trim()) {
-          contactsObj[c.key] = c.value;
-        }
-      });
-
-      const updateUrl = `${API_URL}/portfolio/update`;
-      console.log("📡 Save URL:", updateUrl);
-      console.log("🔐 User identified via auth cookie");
-
-      const res = await fetch(updateUrl, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          contacts: contactsObj,
-          skills: updatedSkills.filter((s) => s?.trim()),
-          projects: updatedProjects.map((p) => ({
-            name: p.name || "",
-            description: p.description || "",
-            github: p.github || "",
-            liveDemo: p.liveDemo || "",
-          })),
-          testimonials: updatedTestimonials.map((t) => ({
-            clientName: t.clientName || "",
-            comment: t.comment || "",
-            position: t.position || "",
-            company: t.company || "",
-            profilePicture: t.profilePicture || "",
-          })),
-          displayName: updatedDisplayName,
-          occupation: updatedOccupation,
-          about: updatedAbout,
-          profilePicture: updatedProfilePicture,
-          resumeUrl: updatedResumeUrl,
-        }),
-      });
-
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = { error: `HTTP ${res.status}` };
+      setSaveStatus("Saving...");
+      const formData = new FormData();
+      formData.append("contacts", JSON.stringify(contacts));
+      formData.append(
+        "skills",
+        JSON.stringify(skills.filter((s) => s?.trim()))
+      );
+      formData.append("projects", JSON.stringify(projects));
+      formData.append("testimonials", JSON.stringify(testimonials));
+      formData.append("displayName", displayName);
+      formData.append("title", title);
+      formData.append("bio", bio);
+      formData.append("resumeUrl", resumeUrl);
+      formData.append("theme", theme);
+      formData.append("isPublished", isPublished);
+      if (profilePicture) {
+        formData.append("profilePicture", profilePicture);
       }
 
-      console.log("📤 Save response:", { status: res.status, data });
+      const res = await fetch(`${API_URL}/portfolio/update`, {
+        method: "PUT",
+        credentials: "include",
+        body: formData,
+      });
 
-      if (res.ok) {
-        setSaveStatus("Saved ✓");
-        setTimeout(() => setSaveStatus(""), 2000);
-
-        socketRef.current?.emit("portfolioUpdated", {
-          username: effectiveUsername,
-          portfolio: {
-            contacts: contactsObj,
-            skills: updatedSkills.filter((s) => s?.trim()),
-            projects: updatedProjects,
-            testimonials: updatedTestimonials,
-            displayName: updatedDisplayName,
-            occupation: updatedOccupation,
-            about: updatedAbout,
-            profilePicture: updatedProfilePicture,
-            resumeUrl: updatedResumeUrl,
-          },
-        });
-      } else {
+      if (!res.ok) {
         if (res.status === 401) {
-          console.log("🚫 Save 401 - unauthorized");
+          console.log("🚫 Unauthorized - logging out");
           logout();
           navigate("/login");
           return;
         }
-        console.error("Save failed:", data);
-        alert(`Update failed: ${data.error || `HTTP ${res.status}`}`);
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       }
+
+      const data = await res.json();
+      console.log("✅ Portfolio saved:", data);
+      setSaveStatus("Saved ✓");
+      setTimeout(() => setSaveStatus(""), 2000);
+      setError("");
+
+      socketRef.current?.emit("portfolioUpdated", {
+        username: effectiveUsername,
+        portfolio: data.portfolio,
+      });
     } catch (err) {
       console.error("💥 Save error:", err);
-      alert(`Save failed: ${err.message}`);
+      setError("Failed to save portfolio");
+      setSaveStatus("");
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ textAlign: "center", padding: "50px" }}>
-        <div>Loading portfolio...</div>
-      </div>
-    );
-  }
+  // Preview handler
+  const handlePreview = () => {
+    const portfolio = {
+      username: effectiveUsername,
+      displayName,
+      title,
+      bio,
+      profilePicture: profilePictureUrl,
+      resumeUrl,
+      contacts,
+      skills,
+      projects,
+      testimonials,
+      theme,
+      isPublished,
+    };
+    localStorage.setItem("previewPortfolio", JSON.stringify(portfolio));
+    window.open(`/portfolio/${effectiveUsername}?preview=true`, "_blank");
+  };
 
   // Contact handlers
   const handleAddContact = () => setAddingContact(true);
   const handleContactChange = (field, value) =>
     setNewContact((prev) => ({ ...prev, [field]: value }));
 
-  const handleNextContact = () => {
-    if (!newContact.key?.trim() || !newContact.value?.trim()) return;
-    const updated = [...contacts, { ...newContact }];
-    setContacts(updated);
-    setNewContact({ key: "", value: "" });
-    savePortfolio(
-      updated,
-      skills,
-      projects,
-      testimonials,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
-  };
-
   const handleSaveContact = () => {
-    handleNextContact();
-    setAddingContact(false);
+    if (newContact.key?.trim() && newContact.value?.trim()) {
+      setContacts({ ...contacts, [newContact.key]: newContact.value });
+      setNewContact({ key: "", value: "" });
+      setAddingContact(false);
+    }
   };
 
-  const handleEditContact = (index, field, value) => {
-    const updated = [...contacts];
-    updated[index][field] = value;
-    setContacts(updated);
-    savePortfolio(
-      updated,
-      skills,
-      projects,
-      testimonials,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
+  const handleEditContact = (key, value) => {
+    setContacts({ ...contacts, [key]: value });
   };
 
-  const handleDeleteContact = (index) => {
-    const updated = contacts.filter((_, i) => i !== index);
+  const handleDeleteContact = (key) => {
+    const updated = { ...contacts };
+    delete updated[key];
     setContacts(updated);
-    savePortfolio(
-      updated,
-      skills,
-      projects,
-      testimonials,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
   };
 
   // Skills handlers
   const handleAddSkill = () => setAddingSkill(true);
-  const handleNextSkill = () => {
-    if (!newSkill?.trim()) return;
-    const updated = [...skills, newSkill];
-    setSkills(updated);
-    setNewSkill("");
-    savePortfolio(
-      contacts,
-      updated,
-      projects,
-      testimonials,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
-  };
-
   const handleSaveSkill = () => {
-    handleNextSkill();
-    setAddingSkill(false);
+    if (newSkill?.trim()) {
+      setSkills([...skills, newSkill]);
+      setNewSkill("");
+      setAddingSkill(false);
+    }
   };
 
   const handleEditSkill = (index, value) => {
     const updated = [...skills];
     updated[index] = value;
     setSkills(updated);
-    savePortfolio(
-      contacts,
-      updated,
-      projects,
-      testimonials,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
   };
 
   const handleDeleteSkill = (index) => {
-    const updated = skills.filter((_, i) => i !== index);
-    setSkills(updated);
-    savePortfolio(
-      contacts,
-      updated,
-      projects,
-      testimonials,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
+    setSkills(skills.filter((_, i) => i !== index));
   };
 
   // Projects handlers
   const handleAddProject = () => setAddingProject(true);
-  const handleNextProject = () => {
-    const updated = [...projects, { ...newProject }];
-    setProjects(updated);
-    setNewProject({ name: "", description: "", github: "", liveDemo: "" });
-    savePortfolio(
-      contacts,
-      skills,
-      updated,
-      testimonials,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
-  };
-
   const handleSaveProject = () => {
-    handleNextProject();
-    setAddingProject(false);
+    if (
+      newProject.name?.trim() ||
+      newProject.description?.trim() ||
+      newProject.github?.trim() ||
+      newProject.liveDemo?.trim()
+    ) {
+      setProjects([...projects, newProject]);
+      setNewProject({ name: "", description: "", github: "", liveDemo: "" });
+      setAddingProject(false);
+    }
   };
 
   const handleEditProject = (index, field, value) => {
     const updated = [...projects];
     updated[index][field] = value;
     setProjects(updated);
-    savePortfolio(
-      contacts,
-      skills,
-      updated,
-      testimonials,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
   };
 
   const handleDeleteProject = (index) => {
-    const updated = projects.filter((_, i) => i !== index);
-    setProjects(updated);
-    savePortfolio(
-      contacts,
-      skills,
-      updated,
-      testimonials,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
+    setProjects(projects.filter((_, i) => i !== index));
   };
 
   // Testimonials handlers
   const handleAddTestimonial = () => setAddingTestimonial(true);
-  const handleNextTestimonial = () => {
-    const updated = [...testimonials, { ...newTestimonial }];
-    setTestimonials(updated);
-    setNewTestimonial({
-      clientName: "",
-      comment: "",
-      position: "",
-      company: "",
-      profilePicture: "",
-    });
-    savePortfolio(
-      contacts,
-      skills,
-      projects,
-      updated,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
-  };
-
   const handleSaveTestimonial = () => {
-    handleNextTestimonial();
-    setAddingTestimonial(false);
+    if (
+      newTestimonial.clientName?.trim() ||
+      newTestimonial.comment?.trim() ||
+      newTestimonial.position?.trim() ||
+      newTestimonial.company?.trim() ||
+      newTestimonial.profilePicture?.trim()
+    ) {
+      setTestimonials([...testimonials, newTestimonial]);
+      setNewTestimonial({
+        clientName: "",
+        comment: "",
+        position: "",
+        company: "",
+        profilePicture: "",
+      });
+      setAddingTestimonial(false);
+    }
   };
 
   const handleEditTestimonial = (index, field, value) => {
     const updated = [...testimonials];
     updated[index][field] = value;
     setTestimonials(updated);
-    savePortfolio(
-      contacts,
-      skills,
-      projects,
-      updated,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
   };
 
   const handleDeleteTestimonial = (index) => {
-    const updated = testimonials.filter((_, i) => i !== index);
-    setTestimonials(updated);
-    savePortfolio(
-      contacts,
-      skills,
-      projects,
-      updated,
-      displayName,
-      occupation,
-      about,
-      profilePicture,
-      resumeUrl
-    );
+    setTestimonials(testimonials.filter((_, i) => i !== index));
   };
 
-  // Profile handlers
+  // Profile handlers for components
   const handleProfileChange = (field, value) => {
     switch (field) {
       case "displayName":
         setDisplayName(value);
         break;
-      case "occupation":
-        setOccupation(value);
+      case "title":
+        setTitle(value);
         break;
-      case "about":
-        setAbout(value);
-        break;
-      case "profilePicture":
-        setProfilePicture(value);
+      case "bio":
+        setBio(value);
         break;
       case "resumeUrl":
         setResumeUrl(value);
@@ -588,67 +363,71 @@ function AdminPage() {
       default:
         break;
     }
-    savePortfolio(
-      contacts,
-      skills,
-      projects,
-      testimonials,
-      field === "displayName" ? value : displayName,
-      field === "occupation" ? value : occupation,
-      field === "about" ? value : about,
-      field === "profilePicture" ? value : profilePicture,
-      field === "resumeUrl" ? value : resumeUrl
-    );
   };
 
-  // Skills grid layout
-  const skillColumns = [[], []];
-  skills.forEach((s, i) => {
-    const colIndex = Math.floor((i % 16) / 8);
-    skillColumns[colIndex].push({ value: s, index: i });
-  });
+  if (loading) {
+    return (
+      <div className="admin-container">
+        <p>Loading portfolio...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-container">
+        <p>Error: {error}</p>
+      </div>
+    );
+  }
+
+  if (!effectiveUsername) {
+    return (
+      <div className="admin-container">
+        <p>No user specified</p>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-container">
       <h1>
-        Admin Page {effectiveUsername ? `- ${effectiveUsername}` : ""}
+        Admin Page - {effectiveUsername}
         {saveStatus && (
           <span style={{ color: "green", marginLeft: "10px" }}>
-            ✓ {saveStatus}
+            {saveStatus}
           </span>
         )}
       </h1>
-      <button
-        onClick={handlePreview}
-        className="save-btn"
-        style={{ marginBottom: "20px" }}
-      >
-        Preview Portfolio
-      </button>
+      <div style={{ marginBottom: "20px" }}>
+        <button onClick={handlePreview} className="save-btn">
+          Preview Portfolio
+        </button>
+        <button
+          onClick={savePortfolio}
+          className="save-btn"
+          style={{ marginLeft: "10px" }}
+        >
+          Save Portfolio
+        </button>
+      </div>
 
       {/* Profile Section */}
       <section>
         <h2>Profile</h2>
         <IntroductionSection
           isAdmin={true}
-          portfolio={{
-            displayName,
-            occupation,
-            introduction:
-              displayName && occupation
-                ? `Hi, I'm ${displayName} — ${occupation}`
-                : "Welcome to my portfolio!",
-          }}
+          portfolio={{ displayName, title }}
           onChange={handleProfileChange}
         />
         <ProfilePictureSection
           isAdmin={true}
-          portfolio={{ profilePicture }}
-          onChange={handleProfileChange}
+          portfolio={{ profilePicture: profilePictureUrl }}
+          onChange={handleProfilePictureChange}
         />
         <AboutSection
           isAdmin={true}
-          portfolio={{ about }}
+          portfolio={{ bio }}
           onChange={handleProfileChange}
         />
         <ResumeSection
@@ -656,12 +435,30 @@ function AdminPage() {
           portfolio={{ resumeUrl }}
           onChange={handleProfileChange}
         />
+        <div>
+          <h3>Theme</h3>
+          <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <div>
+          <h3>Publish</h3>
+          <label>
+            <input
+              type="checkbox"
+              checked={isPublished}
+              onChange={(e) => setIsPublished(e.target.checked)}
+            />
+            Make Portfolio Public
+          </label>
+        </div>
       </section>
 
       {/* Contacts Section */}
       <section>
         <h2>
-          Contacts{" "}
+          Contacts
           <button className="add-btn" onClick={handleAddContact}>
             ADD
           </button>
@@ -669,15 +466,15 @@ function AdminPage() {
         {addingContact && (
           <div
             style={{
-              marginBottom: "10px",
               display: "flex",
               gap: "10px",
+              marginBottom: "10px",
               flexWrap: "wrap",
             }}
           >
             <input
               type="text"
-              placeholder="Field name (e.g., Email, Phone)"
+              placeholder="Field name (e.g., Email, GitHub)"
               value={newContact.key}
               onChange={(e) => handleContactChange("key", e.target.value)}
               style={{ flex: "1", minWidth: "200px" }}
@@ -689,57 +486,66 @@ function AdminPage() {
               onChange={(e) => handleContactChange("value", e.target.value)}
               style={{ flex: "1", minWidth: "200px" }}
             />
-            <button className="next-btn" onClick={handleNextContact}>
-              <FiArrowRight /> Next
-            </button>
             <button className="ok-btn" onClick={handleSaveContact}>
               OK
             </button>
           </div>
         )}
         <ul style={{ listStyle: "none", padding: 0 }}>
-          {contacts.map((c, i) => (
-            <li
-              key={i}
-              style={{
-                display: "flex",
-                gap: "10px",
-                marginBottom: "10px",
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <input
-                className="editable-item"
-                value={c.key}
-                onChange={(e) => handleEditContact(i, "key", e.target.value)}
-                placeholder="Field name"
-                style={{ flex: "1", minWidth: "150px" }}
-              />
-              <input
-                className="editable-item"
-                value={c.value}
-                onChange={(e) => handleEditContact(i, "value", e.target.value)}
-                placeholder="Value"
-                style={{ flex: "2", minWidth: "200px" }}
-              />
-              <FiTrash2
-                onClick={() => handleDeleteContact(i)}
-                style={{
-                  cursor: "pointer",
-                  color: "#ff4444",
-                  fontSize: "18px",
-                }}
-              />
-            </li>
-          ))}
+          {Object.entries(contacts).map(
+            ([key, value]) =>
+              value &&
+              value.trim() !== "" && (
+                <li
+                  key={key}
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    marginBottom: "10px",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <input
+                    className="editable-item"
+                    value={key}
+                    onChange={(e) => {
+                      const newKey = e.target.value;
+                      if (newKey && newKey !== key) {
+                        const updated = { ...contacts };
+                        delete updated[key];
+                        updated[newKey] = value;
+                        setContacts(updated);
+                      }
+                    }}
+                    placeholder="Field name"
+                    style={{ flex: "1", minWidth: "150px" }}
+                  />
+                  <input
+                    className="editable-item"
+                    value={value}
+                    onChange={(e) => handleEditContact(key, e.target.value)}
+                    placeholder="Value"
+                    style={{ flex: "2", minWidth: "200px" }}
+                  />
+                  <FiTrash2
+                    onClick={() => handleDeleteContact(key)}
+                    style={{
+                      cursor: "pointer",
+                      color: "#ff4444",
+                      fontSize: "18px",
+                    }}
+                  />
+                </li>
+              )
+          )}
         </ul>
       </section>
 
       {/* Skills Section */}
       <section>
         <h2>
-          Skills{" "}
+          Skills
           <button className="add-btn" onClick={handleAddSkill}>
             ADD
           </button>
@@ -747,9 +553,9 @@ function AdminPage() {
         {addingSkill && (
           <div
             style={{
-              marginBottom: "10px",
               display: "flex",
               gap: "10px",
+              marginBottom: "10px",
               alignItems: "center",
             }}
           >
@@ -761,47 +567,41 @@ function AdminPage() {
               onChange={(e) => setNewSkill(e.target.value)}
               style={{ flex: 1 }}
             />
-            <button className="next-btn" onClick={handleNextSkill}>
-              <FiArrowRight /> Next
-            </button>
             <button className="ok-btn" onClick={handleSaveSkill}>
               OK
             </button>
           </div>
         )}
         <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-          {skillColumns.map((col, cIndex) => (
-            <div
-              key={cIndex}
-              style={{ display: "flex", flexDirection: "column", gap: "5px" }}
-            >
-              {col.map((s) => (
+          {skills.map(
+            (skill, index) =>
+              skill &&
+              skill.trim() !== "" && (
                 <div
-                  key={s.index}
+                  key={index}
                   style={{ display: "flex", alignItems: "center", gap: "5px" }}
                 >
                   <input
                     className="editable-item"
                     type="text"
-                    value={s.value}
-                    onChange={(e) => handleEditSkill(s.index, e.target.value)}
+                    value={skill}
+                    onChange={(e) => handleEditSkill(index, e.target.value)}
                     style={{ flex: 1 }}
                   />
                   <FiTrash2
-                    onClick={() => handleDeleteSkill(s.index)}
+                    onClick={() => handleDeleteSkill(index)}
                     style={{ cursor: "pointer", color: "#ff4444" }}
                   />
                 </div>
-              ))}
-            </div>
-          ))}
+              )
+          )}
         </div>
       </section>
 
       {/* Projects Section */}
       <section>
         <h2>
-          Projects{" "}
+          Projects
           <button className="add-btn" onClick={handleAddProject}>
             ADD
           </button>
@@ -816,6 +616,7 @@ function AdminPage() {
               onChange={(e) =>
                 setNewProject({ ...newProject, name: e.target.value })
               }
+              style={{ width: "100%", margin: "5px 0" }}
             />
             <textarea
               className="editable-item"
@@ -828,30 +629,27 @@ function AdminPage() {
             />
             <input
               className="editable-item"
-              type="text"
+              type="url"
               placeholder="GitHub Link"
               value={newProject.github}
               onChange={(e) =>
                 setNewProject({ ...newProject, github: e.target.value })
               }
+              style={{ width: "100%", margin: "5px 0" }}
             />
             <input
               className="editable-item"
-              type="text"
+              type="url"
               placeholder="Live Demo Link"
               value={newProject.liveDemo}
               onChange={(e) =>
                 setNewProject({ ...newProject, liveDemo: e.target.value })
               }
+              style={{ width: "100%", margin: "5px 0" }}
             />
-            <div style={{ marginTop: "10px" }}>
-              <button className="next-btn" onClick={handleNextProject}>
-                <FiArrowRight /> Next
-              </button>
-              <button className="ok-btn" onClick={handleSaveProject}>
-                OK
-              </button>
-            </div>
+            <button className="ok-btn" onClick={handleSaveProject}>
+              OK
+            </button>
           </div>
         )}
         <ul style={{ listStyle: "none", padding: 0 }}>
@@ -869,6 +667,7 @@ function AdminPage() {
                 value={p.name}
                 onChange={(e) => handleEditProject(i, "name", e.target.value)}
                 placeholder="Project Name"
+                style={{ width: "100%", margin: "5px 0" }}
               />
               <textarea
                 className="editable-item"
@@ -884,6 +683,7 @@ function AdminPage() {
                 value={p.github}
                 onChange={(e) => handleEditProject(i, "github", e.target.value)}
                 placeholder="GitHub Link"
+                style={{ width: "100%", margin: "5px 0" }}
               />
               <input
                 className="editable-item"
@@ -892,6 +692,7 @@ function AdminPage() {
                   handleEditProject(i, "liveDemo", e.target.value)
                 }
                 placeholder="Live Demo Link"
+                style={{ width: "100%", margin: "5px 0" }}
               />
               <FiTrash2
                 onClick={() => handleDeleteProject(i)}
@@ -905,7 +706,7 @@ function AdminPage() {
       {/* Testimonials Section */}
       <section>
         <h2>
-          Testimonials{" "}
+          Testimonials
           <button className="add-btn" onClick={handleAddTestimonial}>
             ADD
           </button>
@@ -923,6 +724,7 @@ function AdminPage() {
                   clientName: e.target.value,
                 })
               }
+              style={{ width: "100%", margin: "5px 0" }}
             />
             <textarea
               className="editable-item"
@@ -947,6 +749,7 @@ function AdminPage() {
                   position: e.target.value,
                 })
               }
+              style={{ width: "100%", margin: "5px 0" }}
             />
             <input
               className="editable-item"
@@ -959,10 +762,11 @@ function AdminPage() {
                   company: e.target.value,
                 })
               }
+              style={{ width: "100%", margin: "5px 0" }}
             />
             <input
               className="editable-item"
-              type="text"
+              type="url"
               placeholder="Profile Picture URL"
               value={newTestimonial.profilePicture}
               onChange={(e) =>
@@ -971,15 +775,11 @@ function AdminPage() {
                   profilePicture: e.target.value,
                 })
               }
+              style={{ width: "100%", margin: "5px 0" }}
             />
-            <div style={{ marginTop: "10px" }}>
-              <button className="next-btn" onClick={handleNextTestimonial}>
-                <FiArrowRight /> Next
-              </button>
-              <button className="ok-btn" onClick={handleSaveTestimonial}>
-                OK
-              </button>
-            </div>
+            <button className="ok-btn" onClick={handleSaveTestimonial}>
+              OK
+            </button>
           </div>
         )}
         <ul style={{ listStyle: "none", padding: 0 }}>
@@ -999,6 +799,7 @@ function AdminPage() {
                   handleEditTestimonial(i, "clientName", e.target.value)
                 }
                 placeholder="Client Name"
+                style={{ width: "100%", margin: "5px 0" }}
               />
               <textarea
                 className="editable-item"
@@ -1016,6 +817,7 @@ function AdminPage() {
                   handleEditTestimonial(i, "position", e.target.value)
                 }
                 placeholder="Client Position"
+                style={{ width: "100%", margin: "5px 0" }}
               />
               <input
                 className="editable-item"
@@ -1024,6 +826,7 @@ function AdminPage() {
                   handleEditTestimonial(i, "company", e.target.value)
                 }
                 placeholder="Client Company"
+                style={{ width: "100%", margin: "5px 0" }}
               />
               <input
                 className="editable-item"
@@ -1032,6 +835,7 @@ function AdminPage() {
                   handleEditTestimonial(i, "profilePicture", e.target.value)
                 }
                 placeholder="Profile Picture URL"
+                style={{ width: "100%", margin: "5px 0" }}
               />
               <FiTrash2
                 onClick={() => handleDeleteTestimonial(i)}

@@ -30,22 +30,17 @@ function HomePage() {
     try {
       console.log(`📡 Fetching portfolio for: ${username}`);
       const res = await fetch(`${API_URL}/portfolio/${username.toLowerCase()}`);
-
       if (!res.ok) {
         if (res.status === 404) {
-          throw new Error(`Portfolio not found or is private`);
+          throw new Error("Portfolio not found or is not published");
         }
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       }
-
       const data = await res.json();
       console.log("✅ Portfolio loaded:", data);
-
-      // Validate portfolio structure
       if (!data || typeof data !== "object") {
         throw new Error("Invalid portfolio data received");
       }
-
       setPortfolio(data);
       setError("");
     } catch (err) {
@@ -68,10 +63,9 @@ function HomePage() {
 
     fetchPortfolio();
 
-    // Socket setup with Render-friendly configuration
     const socket = io(SOCKET_URL, {
-      transports: ["polling", "websocket"], // Prefer polling for Render
-      withCredentials: false, // Public view - no auth needed
+      transports: ["polling", "websocket"],
+      withCredentials: false,
       timeout: 10000,
       reconnection: true,
       reconnectionAttempts: 5,
@@ -91,7 +85,6 @@ function HomePage() {
         "⚠️ Socket connection error (using polling fallback):",
         err.message
       );
-      // Don't crash - continue without real-time updates
     });
 
     socket.on("disconnect", () => {
@@ -155,11 +148,21 @@ function HomePage() {
   const safeTestimonials = Array.isArray(portfolio.testimonials)
     ? portfolio.testimonials
     : [];
+  const hasDisplayName =
+    portfolio.displayName && portfolio.displayName.trim() !== "";
+  const hasTitle = portfolio.title && portfolio.title.trim() !== "";
+
+  // Helper to check if value is a URL
+  const isUrl = (value) => {
+    return (
+      typeof value === "string" &&
+      (value.startsWith("http://") || value.startsWith("https://"))
+    );
+  };
 
   return (
     <div className={`App ${portfolio.theme === "dark" ? "dark-mode" : ""}`}>
-      <IntroductionSection isAdmin={false} portfolio={portfolio} />
-
+      {/* Header with Introduction, Profile Picture, Name, Title, About */}
       <header
         className="portfolio-header"
         style={{
@@ -171,102 +174,144 @@ function HomePage() {
       >
         <ProfilePictureSection isAdmin={false} portfolio={portfolio} />
         <div>
-          <h1>{portfolio.displayName || portfolio.username || "Portfolio"}</h1>
-          {portfolio.title && (
-            <p className="portfolio-title">{portfolio.title}</p>
-          )}
-          {portfolio.bio && <p className="portfolio-bio">{portfolio.bio}</p>}
+          <IntroductionSection isAdmin={false} portfolio={portfolio} />
+          {hasDisplayName && <h1>{portfolio.displayName}</h1>}
+          {hasTitle && <p className="portfolio-title">{portfolio.title}</p>}
           <AboutSection isAdmin={false} portfolio={portfolio} />
         </div>
       </header>
 
+      {/* Resume */}
       <ResumeSection isAdmin={false} portfolio={portfolio} />
 
+      {/* Contacts - Show only if has data */}
       {Object.keys(safeContacts).length > 0 && (
         <section className="section">
           <h2>Contact Information</h2>
           <ul className="contacts-list">
-            {Object.entries(safeContacts).map(([key, value]) => (
-              <li key={key}>
-                <strong>{key}:</strong> {value}
-              </li>
-            ))}
+            {Object.entries(safeContacts).map(
+              ([key, value]) =>
+                value &&
+                value.trim() !== "" && (
+                  <li key={key}>
+                    <strong>{key}:</strong>{" "}
+                    {isUrl(value) ? (
+                      <a href={value} target="_blank" rel="noopener noreferrer">
+                        {value}
+                      </a>
+                    ) : (
+                      value
+                    )}
+                  </li>
+                )
+            )}
           </ul>
         </section>
       )}
 
+      {/* Skills - Show only if has data */}
       {safeSkills.length > 0 && (
         <section className="section">
           <h2>Skills & Expertise</h2>
           <div className="skills-grid">
-            {safeSkills.map((skill, i) => (
-              <span key={i} className="skill-tag">
-                {skill}
-              </span>
-            ))}
+            {safeSkills.map(
+              (skill, i) =>
+                skill &&
+                skill.trim() !== "" && (
+                  <span key={i} className="skill-tag">
+                    {skill}
+                  </span>
+                )
+            )}
           </div>
         </section>
       )}
 
+      {/* Projects - Show only if has data */}
       {safeProjects.length > 0 && (
         <section className="section">
           <h2>Projects</h2>
           <div className="projects-list">
-            {safeProjects.map((p, i) => (
-              <div key={i} className="project-card">
-                {p.name && <h3>{p.name}</h3>}
-                {p.description && <p>{p.description}</p>}
-                <div className="project-links">
-                  {p.github && (
-                    <a
-                      href={p.github}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="project-link"
-                    >
-                      🔗 GitHub Link
-                    </a>
-                  )}
-                  {p.liveDemo && (
-                    <a
-                      href={p.liveDemo}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="project-link"
-                    >
-                      🌐 Live Demo
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
+            {safeProjects.map(
+              (p, i) =>
+                (p.name || p.description || p.github || p.liveDemo) && (
+                  <div key={i} className="project-card">
+                    {p.name && p.name.trim() !== "" && <h3>{p.name}</h3>}
+                    {p.description && p.description.trim() !== "" && (
+                      <p>{p.description}</p>
+                    )}
+                    <div className="project-links">
+                      {p.github && p.github.trim() !== "" && (
+                        <a
+                          href={p.github}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="project-link"
+                        >
+                          🔗 GitHub Link
+                        </a>
+                      )}
+                      {p.liveDemo && p.liveDemo.trim() !== "" && (
+                        <a
+                          href={p.liveDemo}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="project-link"
+                        >
+                          🌐 Live Demo
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )
+            )}
           </div>
         </section>
       )}
 
+      {/* Testimonials - Show only if has data */}
       {safeTestimonials.length > 0 && (
         <section className="section">
           <h2>Client Testimonials</h2>
           <div className="testimonials-list">
-            {safeTestimonials.map((t, i) => (
-              <div key={i} className="testimonial-card">
-                <div className="testimonial-header">
-                  {t.profilePicture && (
-                    <img
-                      src={t.profilePicture}
-                      alt={t.clientName}
-                      className="testimonial-avatar"
-                    />
-                  )}
-                  <div className="testimonial-info">
-                    <strong>{t.clientName}</strong>
-                    {t.position && <span>, {t.position}</span>}
-                    {t.company && <span> at {t.company}</span>}
+            {safeTestimonials.map(
+              (t, i) =>
+                (t.clientName ||
+                  t.position ||
+                  t.company ||
+                  t.comment ||
+                  t.profilePicture) && (
+                  <div key={i} className="testimonial-card">
+                    <div className="testimonial-header">
+                      {t.profilePicture && t.profilePicture.trim() !== "" && (
+                        <img
+                          src={t.profilePicture}
+                          alt={t.clientName || "Client"}
+                          className="testimonial-avatar"
+                        />
+                      )}
+                      <div className="testimonial-info">
+                        {t.clientName && t.clientName.trim() !== "" && (
+                          <strong>{t.clientName}</strong>
+                        )}
+                        {(t.position || t.company) && (
+                          <span>
+                            {t.position &&
+                              t.position.trim() !== "" &&
+                              `, ${t.position}`}
+                            {t.company &&
+                              t.company.trim() !== "" &&
+                              ` at ${t.company}`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {t.comment && t.comment.trim() !== "" && (
+                      <p className="testimonial-comment">"{t.comment}"</p>
+                    )}
                   </div>
-                </div>
-                <p className="testimonial-comment">"{t.comment}"</p>
-              </div>
-            ))}
+                )
+            )}
           </div>
         </section>
       )}
