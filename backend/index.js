@@ -120,33 +120,66 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ✅ Socket.io with proper CORS (maintained from your original)
+// ✅ Socket.io with Render-friendly configuration
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
+  // Render-friendly Socket.IO settings
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ["polling", "websocket"], // Support both
+  allowEIO3: true, // Support older clients
 });
 
 app.set("io", io);
 
+// ✅ Enhanced Socket connection handler
 io.on("connection", (socket) => {
   console.log("🔌 Socket connected:", socket.id);
 
+  // Handle room joining with error checking
   socket.on("joinPortfolioRoom", (username) => {
-    socket.join(username);
-    console.log(`Socket ${socket.id} joined room: ${username}`);
+    try {
+      if (username && typeof username === "string") {
+        const roomName = username.toLowerCase().trim();
+        socket.join(roomName);
+        console.log(`Socket ${socket.id} joined room: ${roomName}`);
+
+        // Confirm join to client
+        socket.emit("roomJoined", { room: roomName });
+      }
+    } catch (error) {
+      console.error("Error joining room:", error);
+    }
   });
 
+  // Handle portfolio updates
   socket.on("portfolioUpdated", (data) => {
-    const username = data.username;
-    io.to(username).emit("portfolioUpdated", data);
-    console.log(`📊 Portfolio updated for: ${username}`);
+    try {
+      const username = data?.username;
+      if (username && data?.portfolio) {
+        const roomName = username.toLowerCase().trim();
+        io.to(roomName).emit("portfolioUpdated", {
+          username: username,
+          portfolio: data.portfolio,
+        });
+        console.log(`📊 Portfolio updated for room: ${roomName}`);
+      }
+    } catch (error) {
+      console.error("Error broadcasting portfolio update:", error);
+    }
   });
 
-  socket.on("disconnect", () => {
-    console.log("🔌 Socket disconnected:", socket.id);
+  socket.on("disconnect", (reason) => {
+    console.log(`🔌 Socket disconnected: ${socket.id} (${reason})`);
+  });
+
+  // Handle connection errors
+  socket.on("error", (error) => {
+    console.error(`Socket ${socket.id} error:`, error);
   });
 });
 
@@ -215,7 +248,7 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`   - GET  /api/auth/me`);
   console.log(`   - GET  /api/portfolio/*`);
   console.log(`   - GET  /api/admin/*`);
-  console.log(`🔌 Socket.io enabled`);
+  console.log(`🔌 Socket.io enabled with polling fallback`);
 
   if (process.env.NODE_ENV !== "production") {
     console.log(`🔑 JWT_SECRET length: ${process.env.JWT_SECRET?.length}`);
