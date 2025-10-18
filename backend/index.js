@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 const http = require("http");
 const { Server } = require("socket.io");
+const path = require("path");
 
 const authRoutes = require("./routes/auth");
 const portfolioRoutes = require("./routes/portfolio");
@@ -61,7 +62,9 @@ app.use(
 
 // ✅ Essential Middlewares
 app.use(express.json({ limit: "10mb" })); // Handle larger payloads
+app.use(express.urlencoded({ extended: true })); // Handle FormData for file uploads
 app.use(cookieParser()); // ✅ Required for httpOnly cookies
+app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // Serve uploaded files
 
 // ✅ Request logging middleware with token presence
 app.use((req, res, next) => {

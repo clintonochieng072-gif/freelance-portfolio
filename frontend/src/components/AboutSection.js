@@ -1,10 +1,9 @@
-// frontend/src/components/AboutSection.js
 import React from "react";
 
-const AboutSection = ({ isAdmin, portfolio, updatePortfolio }) => {
-  const handleAboutChange = (e) => {
-    if (isAdmin && updatePortfolio) {
-      updatePortfolio({ about: e.target.value });
+const AboutSection = ({ isAdmin, portfolio, onChange }) => {
+  const handleBioChange = (e) => {
+    if (isAdmin && onChange) {
+      onChange("bio", e.target.value);
     }
   };
 
@@ -13,15 +12,15 @@ const AboutSection = ({ isAdmin, portfolio, updatePortfolio }) => {
       <h2>About</h2>
       {isAdmin ? (
         <textarea
-          value={portfolio.about || ""}
-          onChange={handleAboutChange}
+          value={portfolio.bio || ""}
+          onChange={handleBioChange}
           placeholder="Tell us about yourself..."
-          className="about-textarea"
+          className="editable-item"
           rows="5"
           style={{ width: "100%", padding: "10px" }}
         />
-      ) : portfolio.about && portfolio.about.trim() !== "" ? (
-        <p className="about-text">{portfolio.about}</p>
+      ) : portfolio.bio && portfolio.bio.trim() !== "" ? (
+        <p className="about-text">{portfolio.bio}</p>
       ) : (
         <p>No about information provided.</p>
       )}

@@ -1,28 +1,9 @@
-// frontend/src/components/ProfilePictureSection.js
 import React from "react";
 
-const ProfilePictureSection = ({ isAdmin, portfolio, updatePortfolio }) => {
-  const handleFileChange = async (e) => {
-    if (isAdmin && updatePortfolio && e.target.files[0]) {
-      const file = e.target.files[0];
-      // Simulate upload (replace with real backend call)
-      try {
-        const formData = new FormData();
-        formData.append("image", file);
-        const res = await fetch(
-          "https://portfolio-backend-clinton.onrender.com/api/portfolio/upload-image",
-          {
-            method: "POST",
-            credentials: "include",
-            body: formData,
-          }
-        );
-        if (!res.ok) throw new Error("Image upload failed");
-        const data = await res.json();
-        updatePortfolio({ profilePicture: data.imageUrl });
-      } catch (err) {
-        console.error("Error uploading image:", err);
-      }
+const ProfilePictureSection = ({ isAdmin, portfolio, onChange }) => {
+  const handleFileChange = (e) => {
+    if (isAdmin && onChange && e.target.files[0]) {
+      onChange(e); // Pass event to AdminPage.js
     }
   };
 
@@ -38,17 +19,12 @@ const ProfilePictureSection = ({ isAdmin, portfolio, updatePortfolio }) => {
             id="profilePicture"
             accept="image/*"
             onChange={handleFileChange}
+            className="editable-item"
             style={{ display: "none" }}
           />
           <button
             onClick={() => document.getElementById("profilePicture").click()}
-            style={{
-              padding: "10px 20px",
-              background: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-            }}
+            className="editable-item"
           >
             Add Picture
           </button>
@@ -56,6 +32,7 @@ const ProfilePictureSection = ({ isAdmin, portfolio, updatePortfolio }) => {
             <img
               src={portfolio.profilePicture}
               alt="Profile Preview"
+              className="profile-picture-preview"
               style={{
                 width: "100px",
                 height: "100px",

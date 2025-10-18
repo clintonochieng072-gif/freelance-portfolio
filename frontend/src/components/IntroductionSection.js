@@ -1,16 +1,15 @@
-// frontend/src/components/IntroductionSection.js
 import React from "react";
 
-const IntroductionSection = ({ isAdmin, portfolio, updatePortfolio }) => {
+const IntroductionSection = ({ isAdmin, portfolio, onChange }) => {
   const handleDisplayNameChange = (e) => {
-    if (isAdmin && updatePortfolio) {
-      updatePortfolio({ displayName: e.target.value });
+    if (isAdmin && onChange) {
+      onChange("displayName", e.target.value);
     }
   };
 
-  const handleOccupationChange = (e) => {
-    if (isAdmin && updatePortfolio) {
-      updatePortfolio({ occupation: e.target.value });
+  const handleTitleChange = (e) => {
+    if (isAdmin && onChange) {
+      onChange("title", e.target.value);
     }
   };
 
@@ -26,24 +25,32 @@ const IntroductionSection = ({ isAdmin, portfolio, updatePortfolio }) => {
             value={portfolio.displayName || ""}
             onChange={handleDisplayNameChange}
             placeholder="Enter your full name (e.g., Clinton Ochieng)"
-            className="introduction-input"
+            className="editable-item"
             style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
           />
-          <label htmlFor="occupation">Occupation:</label>
+          <label htmlFor="title">Title:</label>
           <input
             type="text"
-            id="occupation"
-            value={portfolio.occupation || ""}
-            onChange={handleOccupationChange}
-            placeholder="Enter your occupation (e.g., Full Stack Developer)"
-            className="introduction-input"
+            id="title"
+            value={portfolio.title || ""}
+            onChange={handleTitleChange}
+            placeholder="Enter your title (e.g., Full Stack Developer)"
+            className="editable-item"
             style={{ width: "100%", padding: "10px" }}
           />
         </div>
       ) : (
-        <p className="introduction-text">
-          {portfolio.introduction || "Welcome to my portfolio!"}
-        </p>
+        <div className="introduction-text">
+          {portfolio.displayName && portfolio.displayName.trim() !== "" && (
+            <h1>{portfolio.displayName}</h1>
+          )}
+          {portfolio.title && portfolio.title.trim() !== "" && (
+            <p>{portfolio.title}</p>
+          )}
+          {!portfolio.displayName && !portfolio.title && (
+            <p>Welcome to my portfolio!</p>
+          )}
+        </div>
       )}
     </section>
   );

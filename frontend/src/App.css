@@ -87,61 +87,19 @@
 }
 
 /* CONTACTS / PROJECTS / SKILLS */
-.editable-item {
-  margin-bottom: 0.5rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.editable-item input {
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  flex: 1;
-}
-
-.next-btn,
-.ok-btn,
-.cancel-btn,
-.save-btn {
-  padding: 5px 10px;
+.download-btn {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s;
-  margin-left: 4px;
+  margin-top: 20px;
+  transition: background 0.2s;
 }
 
-.next-btn {
-  background: #007bff;
-  color: white;
-}
-.ok-btn {
-  background: #28a745;
-  color: white;
-}
-.cancel-btn {
-  background: #dc3545;
-  color: white;
-}
-.save-btn {
-  background: #333;
-  color: white;
-  margin-top: 10px;
-}
-
-.next-btn:hover {
-  background: #0056b3;
-}
-.ok-btn:hover {
-  background: #1f8f3e;
-}
-.cancel-btn:hover {
-  background: #a71d2a;
-}
-.save-btn:hover {
-  background: #111;
+.download-btn:hover {
+  background-color: #0056b3;
 }
 
 /* SKILLS GRID */
@@ -182,7 +140,7 @@
   margin: 0 0 8px 0;
 }
 
-/* ✅ PROJECT LINKS - VERTICAL LAYOUT */
+/* PROJECT LINKS - VERTICAL LAYOUT */
 .project-links {
   display: flex;
   flex-direction: column;
@@ -208,7 +166,22 @@
   text-decoration: none;
 }
 
-/* ✅ TESTIMONIALS STYLING */
+/* RESUME LINK */
+.resume-link {
+  display: inline-block;
+  padding: 10px 20px;
+  background: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.resume-link:hover {
+  background: #0056b3;
+}
+
+/* TESTIMONIALS STYLING */
 .testimonials-list {
   display: grid;
   gap: 20px;
@@ -222,7 +195,7 @@
   border-left: 4px solid #007bff;
 }
 
-/* ✅ TESTIMONIAL WITH PROFILE PICTURE */
+/* TESTIMONIAL WITH PROFILE PICTURE */
 .testimonial-header {
   display: flex;
   align-items: center;
@@ -264,14 +237,40 @@
   font-size: 0.9em;
 }
 
-/* ADMIN CONTAINER */
-.admin-container {
-  max-width: 900px;
-  margin: 2rem auto;
-  padding: 1rem;
+/* Portfolio Header */
+.portfolio-header {
+  text-align: center;
+  padding: 3rem 1rem;
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  color: white;
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: center;
 }
 
-/* ✅ DARK MODE SUPPORT */
+.portfolio-title {
+  font-size: 1.2em;
+  opacity: 0.9;
+  margin: 0.5rem 0;
+}
+
+.portfolio-bio {
+  max-width: 600px;
+  margin: 1rem auto;
+  line-height: 1.6;
+}
+
+.portfolio-footer {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  border-top: 1px solid #eee;
+  margin-top: 3rem;
+}
+
+/* DARK MODE SUPPORT */
 .dark-mode .App {
   background: #1a202c;
   color: #e2e8f0;
@@ -300,6 +299,22 @@
 }
 
 .dark-mode .project-link:hover {
+  background: #4299e1;
+}
+
+.dark-mode .resume-link {
+  background: #63b3ed;
+}
+
+.dark-mode .resume-link:hover {
+  background: #4299e1;
+}
+
+.dark-mode .download-btn {
+  background: #63b3ed;
+}
+
+.dark-mode .download-btn:hover {
   background: #4299e1;
 }
 
@@ -582,60 +597,6 @@
   color: #28a745;
 }
 
-/* Portfolio Header */
-.portfolio-header {
-  text-align: center;
-  padding: 3rem 1rem;
-  background: linear-gradient(135deg, #007bff, #0056b3);
-  color: white;
-  margin-bottom: 2rem;
-}
-
-.portfolio-title {
-  font-size: 1.2em;
-  opacity: 0.9;
-  margin: 0.5rem 0;
-}
-
-.portfolio-bio {
-  max-width: 600px;
-  margin: 1rem auto;
-  line-height: 1.6;
-}
-
-.portfolio-footer {
-  text-align: center;
-  padding: 2rem;
-  color: #666;
-  border-top: 1px solid #eee;
-  margin-top: 3rem;
-}
-
-/* Dark mode support */
-.dark-mode .stat-card,
-.dark-mode .quick-actions,
-.dark-mode .portfolio-preview,
-.dark-mode .setting-item,
-.dark-mode .auth-card {
-  background: #2d3748;
-  color: #e2e8f0;
-}
-
-.dark-mode .portfolio-url {
-  background: #4a5568;
-  color: #e2e8f0;
-}
-
-.dark-mode .form-group input {
-  background: #4a5568;
-  border-color: #718096;
-  color: #e2e8f0;
-}
-
-.dark-mode .portfolio-header {
-  background: linear-gradient(135deg, #2d3748, #4a5568);
-}
-
 /* New styles for Introduction, About, Profile Picture, and Resume sections */
 .introduction-section {
   margin: 2rem auto;
@@ -654,15 +615,6 @@
   margin: 0.5rem 0;
 }
 
-.introduction-input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 1em;
-  margin-bottom: 10px;
-}
-
 .about-section {
   margin: 2rem auto;
   padding: 1.5rem;
@@ -676,15 +628,6 @@
   font-size: 1em;
   line-height: 1.6;
   color: #444;
-}
-
-.about-textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 1em;
-  resize: vertical;
 }
 
 .profile-picture-section {
@@ -713,13 +656,6 @@
   border: 2px solid #ddd;
 }
 
-.profile-picture-label {
-  display: block;
-  font-weight: 500;
-  margin-bottom: 8px;
-  color: #333;
-}
-
 .profile-picture-button {
   padding: 8px 16px;
   background: #007bff;
@@ -743,20 +679,6 @@
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
 }
 
-.resume-link {
-  display: inline-block;
-  padding: 10px 20px;
-  background: #007bff;
-  color: white;
-  text-decoration: none;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-
-.resume-link:hover {
-  background: #0056b3;
-}
-
 /* Dark mode support for new sections */
 .dark-mode .introduction-section {
   background: #2d3748;
@@ -767,24 +689,12 @@
   color: #e2e8f0;
 }
 
-.dark-mode .introduction-input {
-  background: #4a5568;
-  border-color: #718096;
-  color: #e2e8f0;
-}
-
 .dark-mode .about-section {
   background: #2d3748;
   color: #e2e8f0;
 }
 
 .dark-mode .about-text {
-  color: #e2e8f0;
-}
-
-.dark-mode .about-textarea {
-  background: #4a5568;
-  border-color: #718096;
   color: #e2e8f0;
 }
 
@@ -798,10 +708,6 @@
   color: #cbd5e0;
 }
 
-.dark-mode .profile-picture-label {
-  color: #e2e8f0;
-}
-
 .dark-mode .profile-picture-button {
   background: #63b3ed;
 }
@@ -813,12 +719,4 @@
 .dark-mode .resume-section {
   background: #2d3748;
   color: #e2e8f0;
-}
-
-.dark-mode .resume-link {
-  background: #63b3ed;
-}
-
-.dark-mode .resume-link:hover {
-  background: #4299e1;
 }
