@@ -120,6 +120,7 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
       bio,
       theme,
       isPublished,
+      resumeUrl, // Added to fix ReferenceError
     } = req.body;
 
     let portfolio = await Portfolio.findOne({ username: req.user.username });
@@ -141,15 +142,13 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
     if (theme !== undefined) portfolio.theme = theme || "light";
     if (isPublished !== undefined)
       portfolio.isPublished = isPublished === "true";
-
-    // Handle file uploads
     if (req.files?.profilePicture) {
       portfolio.profilePicture = `/uploads/${req.files.profilePicture[0].filename}`;
     }
     if (req.files?.resumeFile) {
       portfolio.resumeUrl = `/uploads/${req.files.resumeFile[0].filename}`;
-    } else if (resumeUrl !== undefined) {
-      portfolio.resumeUrl = resumeUrl || "";
+    } else if (resumeUrl !== undefined && resumeUrl !== "") {
+      portfolio.resumeUrl = resumeUrl; // Use provided URL if no file uploaded
     }
 
     const savedPortfolio = await portfolio.save();

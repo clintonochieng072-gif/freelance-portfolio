@@ -11,11 +11,12 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useGlobalContext(); // ✅ Only need login function
+  const { login } = useGlobalContext();
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e, isRetry = false) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setMessage("");
 
@@ -23,14 +24,14 @@ function LoginPage() {
       console.log("🔄 Login attempt for:", email);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30 seconds
 
       const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include", // ✅ Backend sets httpOnly cookie
+        credentials: "include",
         signal: controller.signal,
         body: JSON.stringify({ email, password }),
       });
@@ -44,20 +45,14 @@ function LoginPage() {
       console.log("📄 Response data:", data);
 
       if (response.ok && data.user) {
-        // ✅ CRITICAL: Call login with ONLY user data
-        // Backend handles httpOnly cookie automatically
-        login(data.user); // No token parameter needed
-
-        // Store user data for context restoration
+        login(data.user);
         localStorage.setItem("user", JSON.stringify(data.user));
-
         console.log(
           "✅ Login successful - user set in context:",
           data.user.username
         );
         setMessage("✅ Login successful! Redirecting...");
 
-        // ✅ Immediate redirect - ProtectedRoute will use updated context
         setTimeout(() => {
           navigate("/admin/dashboard", { replace: true });
         }, 500);
@@ -66,22 +61,24 @@ function LoginPage() {
       } else {
         console.error("❌ Login failed:", data.error);
         setMessage(`❌ ${data.error || "Invalid credentials"}`);
-
-        // Clear any stale data
         localStorage.removeItem("user");
       }
     } catch (err) {
       console.error("💥 Login error:", err);
 
-      if (err.name === "AbortError") {
-        setMessage("⚠️ Login timeout - server too slow");
+      if (err.name === "AbortError" && !isRetry) {
+        console.warn("Retrying login due to timeout");
+        setMessage("⚠️ Server is starting, retrying...");
+        setTimeout(() => handleLogin(e, true), 1000); // Retry after 1 second
+      } else if (err.name === "AbortError") {
+        setMessage("⚠️ Login timeout - please try again");
       } else if (err.name === "TypeError" && err.message.includes("fetch")) {
-        setMessage("⚠️ Network error - check connection");
+        setMessage("⚠️ Network error - check connection and try again");
       } else {
         setMessage(`❌ ${err.message || "Login failed"}`);
       }
     } finally {
-      setLoading(false);
+      if (!isRetry) setLoading(false); // Only reset on initial attempt
     }
   };
 
