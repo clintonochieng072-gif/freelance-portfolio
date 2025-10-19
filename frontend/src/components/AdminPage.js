@@ -33,10 +33,10 @@ function AdminPage() {
   const [displayName, setDisplayName] = useState("");
   const [title, setTitle] = useState("");
   const [bio, setBio] = useState("");
-  const [profilePicture, setProfilePicture] = useState(null); // File object
-  const [profilePictureUrl, setProfilePictureUrl] = useState(""); // URL for preview
-  const [resumeFile, setResumeFile] = useState(null); // File object
-  const [resumeUrl, setResumeUrl] = useState(""); // URL for preview or link
+  const [profilePicture, setProfilePicture] = useState(null);
+  const [profilePictureUrl, setProfilePictureUrl] = useState("");
+  const [resumeFile, setResumeFile] = useState(null);
+  const [resumeUrl, setResumeUrl] = useState("");
   const [theme, setTheme] = useState("light");
   const [isPublished, setIsPublished] = useState(false);
 
@@ -175,7 +175,7 @@ function AdminPage() {
     const file = e.target.files[0];
     if (file) {
       setResumeFile(file);
-      setResumeUrl(URL.createObjectURL(file)); // Temporary preview
+      setResumeUrl(URL.createObjectURL(file));
     }
   };
 
@@ -183,6 +183,7 @@ function AdminPage() {
   const savePortfolio = async () => {
     try {
       setSaveStatus("Saving...");
+      setError(""); // Clear previous errors
       const formData = new FormData();
       formData.append("contacts", JSON.stringify(contacts));
       formData.append(
@@ -228,7 +229,6 @@ function AdminPage() {
       setTimeout(() => setSaveStatus(""), 2000);
       setError("");
 
-      // Update states with backend response to prevent data loss
       setProfilePictureUrl(data.portfolio.profilePicture || profilePictureUrl);
       setResumeUrl(data.portfolio.resumeUrl || resumeUrl);
       setProjects(data.portfolio.projects || projects);
@@ -276,7 +276,14 @@ function AdminPage() {
   };
 
   const handleSaveContact = () => {
-    handleNextContact();
+    // Add even if one field is filled to allow single entries
+    if (newContact.key?.trim() || newContact.value?.trim()) {
+      setContacts({
+        ...contacts,
+        [newContact.key || "Field"]: newContact.value || "",
+      });
+    }
+    setNewContact({ key: "", value: "" });
     setAddingContact(false);
     savePortfolio();
   };
@@ -301,7 +308,10 @@ function AdminPage() {
   };
 
   const handleSaveSkill = () => {
-    handleNextSkill();
+    if (newSkill?.trim()) {
+      setSkills([...skills, newSkill]);
+    }
+    setNewSkill("");
     setAddingSkill(false);
     savePortfolio();
   };
@@ -331,7 +341,15 @@ function AdminPage() {
   };
 
   const handleSaveProject = () => {
-    handleNextProject();
+    if (
+      newProject.name?.trim() ||
+      newProject.description?.trim() ||
+      newProject.github?.trim() ||
+      newProject.liveDemo?.trim()
+    ) {
+      setProjects([...projects, newProject]);
+    }
+    setNewProject({ name: "", description: "", github: "", liveDemo: "" });
     setAddingProject(false);
     savePortfolio();
   };
@@ -368,7 +386,22 @@ function AdminPage() {
   };
 
   const handleSaveTestimonial = () => {
-    handleNextTestimonial();
+    if (
+      newTestimonial.clientName?.trim() ||
+      newTestimonial.comment?.trim() ||
+      newTestimonial.position?.trim() ||
+      newTestimonial.company?.trim() ||
+      newTestimonial.profilePicture?.trim()
+    ) {
+      setTestimonials([...testimonials, newTestimonial]);
+    }
+    setNewTestimonial({
+      clientName: "",
+      comment: "",
+      position: "",
+      company: "",
+      profilePicture: "",
+    });
     setAddingTestimonial(false);
     savePortfolio();
   };
@@ -414,7 +447,7 @@ function AdminPage() {
   if (error) {
     return (
       <div className="admin-container">
-        <p>Error: {error}</p>
+        <p className="error-message">{error}</p>
       </div>
     );
   }
@@ -437,6 +470,14 @@ function AdminPage() {
           </span>
         )}
       </h1>
+      {error && (
+        <p
+          className="error-message"
+          style={{ color: "red", marginBottom: "10px" }}
+        >
+          {error}
+        </p>
+      )}
       <div style={{ marginBottom: "20px" }}>
         <button onClick={handlePreview} className="save-btn">
           Preview Portfolio
