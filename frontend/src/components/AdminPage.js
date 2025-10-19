@@ -284,19 +284,14 @@ function AdminPage() {
         newKey = `${baseKey}_${counter}`;
         counter++;
       }
-      console.log("🔄 Adding contact to state:", {
-        [newKey]: newContact.value,
-      });
-      setContacts((prev) => {
-        const updated = { ...prev, [newKey]: newContact.value || "" };
-        console.log("🔄 Updated contacts state:", updated);
-        return updated;
-      });
+
+      const updatedContacts = { ...contacts, [newKey]: newContact.value || "" };
+      setContacts(updatedContacts);
       setNewContact({ key: "", value: "" });
     }
   };
 
-  const handleSaveContact = () => {
+  const handleSaveContact = async () => {
     if (newContact.key?.trim() || newContact.value?.trim()) {
       const baseKey =
         newContact.key.trim() || `Field${Object.keys(contacts).length + 1}`;
@@ -306,86 +301,73 @@ function AdminPage() {
         newKey = `${baseKey}_${counter}`;
         counter++;
       }
-      console.log("✅ Saving contact:", { [newKey]: newContact.value });
-      setContacts((prev) => {
-        const updated = { ...prev, [newKey]: newContact.value || "" };
-        console.log("✅ Updated contacts state:", updated);
-        savePortfolio(); // Save to backend after state update
-        return updated;
-      });
+
+      const updatedContacts = { ...contacts, [newKey]: newContact.value || "" };
+      setContacts(updatedContacts);
+
+      // Save to backend immediately
+      await savePortfolio();
     }
     setNewContact({ key: "", value: "" });
     setAddingContact(false);
   };
 
-  const handleEditContact = (key, value) => {
-    console.log("✏️ Editing contact:", { [key]: value });
-    setContacts((prev) => {
-      const updated = { ...prev, [key]: value };
-      console.log("✏️ Updated contacts state:", updated);
-      return updated;
-    });
+  const handleEditContact = async (key, value) => {
+    const updatedContacts = { ...contacts, [key]: value };
+    setContacts(updatedContacts);
+    // Auto-save after editing
+    await savePortfolio();
   };
 
-  const handleDeleteContact = (key) => {
-    console.log("🗑️ Deleting contact:", key);
-    setContacts((prev) => {
-      const updated = { ...prev };
-      delete updated[key];
-      console.log("🗑️ Updated contacts state:", updated);
-      return updated;
-    });
+  const handleDeleteContact = async (key) => {
+    const updatedContacts = { ...contacts };
+    delete updatedContacts[key];
+    setContacts(updatedContacts);
+    // Auto-save after deletion
+    await savePortfolio();
   };
 
   // Skills handlers
   const handleAddSkill = () => setAddingSkill(true);
+
   const handleNextSkill = () => {
     if (newSkill?.trim()) {
-      console.log("🔄 Adding skill:", newSkill);
-      setSkills((prev) => {
-        const updated = [...prev, newSkill];
-        console.log("🔄 Updated skills state:", updated);
-        return updated;
-      });
+      const updatedSkills = [...skills, newSkill];
+      setSkills(updatedSkills);
       setNewSkill("");
     }
   };
 
-  const handleSaveSkill = () => {
+  const handleSaveSkill = async () => {
     if (newSkill?.trim()) {
-      console.log("✅ Saving skill:", newSkill);
-      setSkills((prev) => {
-        const updated = [...prev, newSkill];
-        console.log("✅ Updated skills state:", updated);
-        savePortfolio(); // Save to backend after state update
-        return updated;
-      });
+      const updatedSkills = [...skills, newSkill];
+      setSkills(updatedSkills);
+
+      // Save to backend immediately
+      await savePortfolio();
     }
     setNewSkill("");
     setAddingSkill(false);
   };
 
-  const handleEditSkill = (index, value) => {
-    console.log("✏️ Editing skill at index", index, ":", value);
-    setSkills((prev) => {
-      const updated = [...prev];
-      updated[index] = value;
-      console.log("✏️ Updated skills state:", updated);
-      return updated;
-    });
+  const handleEditSkill = async (index, value) => {
+    const updatedSkills = [...skills];
+    updatedSkills[index] = value;
+    setSkills(updatedSkills);
+    // Auto-save after editing
+    await savePortfolio();
   };
 
-  const handleDeleteSkill = (index) => {
-    console.log("🗑️ Deleting skill at index:", index);
-    setSkills((prev) => {
-      const updated = prev.filter((_, i) => i !== index);
-      console.log("🗑️ Updated skills state:", updated);
-      return updated;
-    });
+  const handleDeleteSkill = async (index) => {
+    const updatedSkills = skills.filter((_, i) => i !== index);
+    setSkills(updatedSkills);
+    // Auto-save after deletion
+    await savePortfolio();
   };
 
   // Projects handlers
   const handleAddProject = () => setAddingProject(true);
+
   const handleNextProject = () => {
     if (
       newProject.name?.trim() ||
@@ -393,56 +375,47 @@ function AdminPage() {
       newProject.github?.trim() ||
       newProject.liveDemo?.trim()
     ) {
-      console.log("🔄 Adding project:", newProject);
-      setProjects((prev) => {
-        const updated = [...prev, newProject];
-        console.log("🔄 Updated projects state:", updated);
-        return updated;
-      });
+      const updatedProjects = [...projects, newProject];
+      setProjects(updatedProjects);
       setNewProject({ name: "", description: "", github: "", liveDemo: "" });
     }
   };
 
-  const handleSaveProject = () => {
+  const handleSaveProject = async () => {
     if (
       newProject.name?.trim() ||
       newProject.description?.trim() ||
       newProject.github?.trim() ||
       newProject.liveDemo?.trim()
     ) {
-      console.log("✅ Saving project:", newProject);
-      setProjects((prev) => {
-        const updated = [...prev, newProject];
-        console.log("✅ Updated projects state:", updated);
-        savePortfolio(); // Save to backend after state update
-        return updated;
-      });
+      const updatedProjects = [...projects, newProject];
+      setProjects(updatedProjects);
+
+      // Save to backend immediately
+      await savePortfolio();
     }
     setNewProject({ name: "", description: "", github: "", liveDemo: "" });
     setAddingProject(false);
   };
 
-  const handleEditProject = (index, field, value) => {
-    console.log("✏️ Editing project at index", index, ":", { [field]: value });
-    setProjects((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      console.log("✏️ Updated projects state:", updated);
-      return updated;
-    });
+  const handleEditProject = async (index, field, value) => {
+    const updatedProjects = [...projects];
+    updatedProjects[index] = { ...updatedProjects[index], [field]: value };
+    setProjects(updatedProjects);
+    // Auto-save after editing
+    await savePortfolio();
   };
 
-  const handleDeleteProject = (index) => {
-    console.log("🗑️ Deleting project at index:", index);
-    setProjects((prev) => {
-      const updated = prev.filter((_, i) => i !== index);
-      console.log("🗑️ Updated projects state:", updated);
-      return updated;
-    });
+  const handleDeleteProject = async (index) => {
+    const updatedProjects = projects.filter((_, i) => i !== index);
+    setProjects(updatedProjects);
+    // Auto-save after deletion
+    await savePortfolio();
   };
 
   // Testimonials handlers
   const handleAddTestimonial = () => setAddingTestimonial(true);
+
   const handleNextTestimonial = () => {
     if (
       newTestimonial.clientName?.trim() ||
@@ -451,12 +424,8 @@ function AdminPage() {
       newTestimonial.company?.trim() ||
       newTestimonial.profilePicture?.trim()
     ) {
-      console.log("🔄 Adding testimonial:", newTestimonial);
-      setTestimonials((prev) => {
-        const updated = [...prev, newTestimonial];
-        console.log("🔄 Updated testimonials state:", updated);
-        return updated;
-      });
+      const updatedTestimonials = [...testimonials, newTestimonial];
+      setTestimonials(updatedTestimonials);
       setNewTestimonial({
         clientName: "",
         comment: "",
@@ -467,7 +436,7 @@ function AdminPage() {
     }
   };
 
-  const handleSaveTestimonial = () => {
+  const handleSaveTestimonial = async () => {
     if (
       newTestimonial.clientName?.trim() ||
       newTestimonial.comment?.trim() ||
@@ -475,13 +444,11 @@ function AdminPage() {
       newTestimonial.company?.trim() ||
       newTestimonial.profilePicture?.trim()
     ) {
-      console.log("✅ Saving testimonial:", newTestimonial);
-      setTestimonials((prev) => {
-        const updated = [...prev, newTestimonial];
-        console.log("✅ Updated testimonials state:", updated);
-        savePortfolio(); // Save to backend after state update
-        return updated;
-      });
+      const updatedTestimonials = [...testimonials, newTestimonial];
+      setTestimonials(updatedTestimonials);
+
+      // Save to backend immediately
+      await savePortfolio();
     }
     setNewTestimonial({
       clientName: "",
@@ -493,29 +460,26 @@ function AdminPage() {
     setAddingTestimonial(false);
   };
 
-  const handleEditTestimonial = (index, field, value) => {
-    console.log("✏️ Editing testimonial at index", index, ":", {
+  const handleEditTestimonial = async (index, field, value) => {
+    const updatedTestimonials = [...testimonials];
+    updatedTestimonials[index] = {
+      ...updatedTestimonials[index],
       [field]: value,
-    });
-    setTestimonials((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      console.log("✏️ Updated testimonials state:", updated);
-      return updated;
-    });
+    };
+    setTestimonials(updatedTestimonials);
+    // Auto-save after editing
+    await savePortfolio();
   };
 
-  const handleDeleteTestimonial = (index) => {
-    console.log("🗑️ Deleting testimonial at index:", index);
-    setTestimonials((prev) => {
-      const updated = prev.filter((_, i) => i !== index);
-      console.log("🗑️ Updated testimonials state:", updated);
-      return updated;
-    });
+  const handleDeleteTestimonial = async (index) => {
+    const updatedTestimonials = testimonials.filter((_, i) => i !== index);
+    setTestimonials(updatedTestimonials);
+    // Auto-save after deletion
+    await savePortfolio();
   };
 
   // Profile handlers for components
-  const handleProfileChange = (field, value) => {
+  const handleProfileChange = async (field, value) => {
     switch (field) {
       case "displayName":
         setDisplayName(value);
@@ -532,6 +496,8 @@ function AdminPage() {
       default:
         break;
     }
+    // Auto-save profile changes after a short delay
+    setTimeout(() => savePortfolio(), 1000);
   };
 
   if (loading) {
@@ -696,10 +662,8 @@ function AdminPage() {
                     const updated = { ...contacts };
                     delete updated[key];
                     updated[newKey] = value;
-                    console.log("✏️ Renaming contact key:", {
-                      [newKey]: value,
-                    });
                     setContacts(updated);
+                    savePortfolio(); // Auto-save after renaming
                   }
                 }}
                 placeholder="Field name"
