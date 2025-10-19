@@ -24,6 +24,7 @@ function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("");
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false); // New: Track saving state
 
   // Portfolio states
   const [contacts, setContacts] = useState({});
@@ -143,7 +144,7 @@ function AdminPage() {
 
       socketRef.current.on("portfolioUpdated", ({ portfolio }) => {
         if (portfolio?.username === effectiveUsername) {
-          console.log("🔄 Portfolio updated via socket");
+          console.log("🔄 Portfolio updated via socket:", portfolio);
           setContacts(portfolio.contacts || {});
           setSkills(portfolio.skills || []);
           setProjects(portfolio.projects || []);
@@ -182,6 +183,7 @@ function AdminPage() {
   // Save portfolio
   const savePortfolio = async () => {
     try {
+      setIsSaving(true); // Disable buttons during save
       setSaveStatus("Saving...");
       setError(""); // Clear previous errors
       const formData = new FormData();
@@ -205,6 +207,8 @@ function AdminPage() {
       } else {
         formData.append("resumeUrl", resumeUrl || "");
       }
+
+      console.log("📡 Sending portfolio save with contacts:", contacts);
 
       const res = await fetch(`${API_URL}/portfolio/update`, {
         method: "PUT",
@@ -240,6 +244,8 @@ function AdminPage() {
       console.error("💥 Save error:", err);
       setError(`Failed to save portfolio: ${err.message}`);
       setSaveStatus("");
+    } finally {
+      setIsSaving(false); // Re-enable buttons
     }
   };
 
@@ -269,47 +275,90 @@ function AdminPage() {
     setNewContact((prev) => ({ ...prev, [field]: value }));
 
   const handleNextContact = () => {
-    if (newContact.key?.trim() && newContact.value?.trim()) {
-      setContacts({ ...contacts, [newContact.key]: newContact.value });
+    if (newContact.key?.trim() || newContact.value?.trim()) {
+      const baseKey =
+        newContact.key.trim() || `Field${Object.keys(contacts).length + 1}`;
+      let newKey = baseKey;
+      let counter = 1;
+      while (contacts[newKey]) {
+        newKey = `${baseKey}_${counter}`; // Append suffix for uniqueness
+        counter++;
+      }
+      console.log("🔄 Adding contact to state:", {
+        [newKey]: newContact.value,
+      });
+      setContacts((prev) => {
+        const updated = { ...prev, [newKey]: newContact.value || "" };
+        console.log("🔄 Updated contacts state:", updated);
+        return updated;
+      });
       setNewContact({ key: "", value: "" });
     }
   };
 
   const handleSaveContact = () => {
-    // Add even if one field is filled to allow single entries
     if (newContact.key?.trim() || newContact.value?.trim()) {
-      setContacts({
-        ...contacts,
-        [newContact.key || "Field"]: newContact.value || "",
+      const baseKey =
+        newContact.key.trim() || `Field${Object.keys(contacts).length + 1}`;
+      let newKey = baseKey;
+      let counter = 1;
+      while (contacts[newKey]) {
+        newKey = `${baseKey}_${counter}`; // Append suffix for uniqueness
+        counter++;
+      }
+      console.log("✅ Saving contact:", { [newKey]: newContact.value });
+      setContacts((prev) => {
+        const updated = { ...prev, [newKey]: newContact.value || "" };
+        console.log("✅ Updated contacts state:", updated);
+        return updated;
       });
+      setNewContact({ key: "", value: "" });
     }
-    setNewContact({ key: "", value: "" });
     setAddingContact(false);
     savePortfolio();
   };
 
   const handleEditContact = (key, value) => {
-    setContacts({ ...contacts, [key]: value });
+    console.log("✏️ Editing contact:", { [key]: value });
+    setContacts((prev) => {
+      const updated = { ...prev, [key]: value };
+      console.log("✏️ Updated contacts state:", updated);
+      return updated;
+    });
   };
 
   const handleDeleteContact = (key) => {
-    const updated = { ...contacts };
-    delete updated[key];
-    setContacts(updated);
+    console.log("🗑️ Deleting contact:", key);
+    setContacts((prev) => {
+      const updated = { ...prev };
+      delete updated[key];
+      console.log("🗑️ Updated contacts state:", updated);
+      return updated;
+    });
   };
 
   // Skills handlers
   const handleAddSkill = () => setAddingSkill(true);
   const handleNextSkill = () => {
     if (newSkill?.trim()) {
-      setSkills([...skills, newSkill]);
+      console.log("🔄 Adding skill:", newSkill);
+      setSkills((prev) => {
+        const updated = [...prev, newSkill];
+        console.log("🔄 Updated skills state:", updated);
+        return updated;
+      });
       setNewSkill("");
     }
   };
 
   const handleSaveSkill = () => {
     if (newSkill?.trim()) {
-      setSkills([...skills, newSkill]);
+      console.log("✅ Saving skill:", newSkill);
+      setSkills((prev) => {
+        const updated = [...prev, newSkill];
+        console.log("✅ Updated skills state:", updated);
+        return updated;
+      });
     }
     setNewSkill("");
     setAddingSkill(false);
@@ -317,13 +366,22 @@ function AdminPage() {
   };
 
   const handleEditSkill = (index, value) => {
-    const updated = [...skills];
-    updated[index] = value;
-    setSkills(updated);
+    console.log("✏️ Editing skill at index", index, ":", value);
+    setSkills((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      console.log("✏️ Updated skills state:", updated);
+      return updated;
+    });
   };
 
   const handleDeleteSkill = (index) => {
-    setSkills(skills.filter((_, i) => i !== index));
+    console.log("🗑️ Deleting skill at index:", index);
+    setSkills((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      console.log("🗑️ Updated skills state:", updated);
+      return updated;
+    });
   };
 
   // Projects handlers
@@ -335,7 +393,12 @@ function AdminPage() {
       newProject.github?.trim() ||
       newProject.liveDemo?.trim()
     ) {
-      setProjects([...projects, newProject]);
+      console.log("🔄 Adding project:", newProject);
+      setProjects((prev) => {
+        const updated = [...prev, newProject];
+        console.log("🔄 Updated projects state:", updated);
+        return updated;
+      });
       setNewProject({ name: "", description: "", github: "", liveDemo: "" });
     }
   };
@@ -347,7 +410,12 @@ function AdminPage() {
       newProject.github?.trim() ||
       newProject.liveDemo?.trim()
     ) {
-      setProjects([...projects, newProject]);
+      console.log("✅ Saving project:", newProject);
+      setProjects((prev) => {
+        const updated = [...prev, newProject];
+        console.log("✅ Updated projects state:", updated);
+        return updated;
+      });
     }
     setNewProject({ name: "", description: "", github: "", liveDemo: "" });
     setAddingProject(false);
@@ -355,13 +423,22 @@ function AdminPage() {
   };
 
   const handleEditProject = (index, field, value) => {
-    const updated = [...projects];
-    updated[index][field] = value;
-    setProjects(updated);
+    console.log("✏️ Editing project at index", index, ":", { [field]: value });
+    setProjects((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      console.log("✏️ Updated projects state:", updated);
+      return updated;
+    });
   };
 
   const handleDeleteProject = (index) => {
-    setProjects(projects.filter((_, i) => i !== index));
+    console.log("🗑️ Deleting project at index:", index);
+    setProjects((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      console.log("🗑️ Updated projects state:", updated);
+      return updated;
+    });
   };
 
   // Testimonials handlers
@@ -374,7 +451,12 @@ function AdminPage() {
       newTestimonial.company?.trim() ||
       newTestimonial.profilePicture?.trim()
     ) {
-      setTestimonials([...testimonials, newTestimonial]);
+      console.log("🔄 Adding testimonial:", newTestimonial);
+      setTestimonials((prev) => {
+        const updated = [...prev, newTestimonial];
+        console.log("🔄 Updated testimonials state:", updated);
+        return updated;
+      });
       setNewTestimonial({
         clientName: "",
         comment: "",
@@ -393,7 +475,12 @@ function AdminPage() {
       newTestimonial.company?.trim() ||
       newTestimonial.profilePicture?.trim()
     ) {
-      setTestimonials([...testimonials, newTestimonial]);
+      console.log("✅ Saving testimonial:", newTestimonial);
+      setTestimonials((prev) => {
+        const updated = [...prev, newTestimonial];
+        console.log("✅ Updated testimonials state:", updated);
+        return updated;
+      });
     }
     setNewTestimonial({
       clientName: "",
@@ -407,13 +494,24 @@ function AdminPage() {
   };
 
   const handleEditTestimonial = (index, field, value) => {
-    const updated = [...testimonials];
-    updated[index][field] = value;
-    setTestimonials(updated);
+    console.log("✏️ Editing testimonial at index", index, ":", {
+      [field]: value,
+    });
+    setTestimonials((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      console.log("✏️ Updated testimonials state:", updated);
+      return updated;
+    });
   };
 
   const handleDeleteTestimonial = (index) => {
-    setTestimonials(testimonials.filter((_, i) => i !== index));
+    console.log("🗑️ Deleting testimonial at index:", index);
+    setTestimonials((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      console.log("🗑️ Updated testimonials state:", updated);
+      return updated;
+    });
   };
 
   // Profile handlers for components
@@ -444,18 +542,10 @@ function AdminPage() {
     );
   }
 
-  if (error) {
+  if (error && !effectiveUsername) {
     return (
       <div className="admin-container">
         <p className="error-message">{error}</p>
-      </div>
-    );
-  }
-
-  if (!effectiveUsername) {
-    return (
-      <div className="admin-container">
-        <p>No user specified</p>
       </div>
     );
   }
@@ -470,24 +560,22 @@ function AdminPage() {
           </span>
         )}
       </h1>
-      {error && (
-        <p
-          className="error-message"
-          style={{ color: "red", marginBottom: "10px" }}
-        >
-          {error}
-        </p>
-      )}
+      {error && <p className="error-message">{error}</p>}
       <div style={{ marginBottom: "20px" }}>
-        <button onClick={handlePreview} className="save-btn">
+        <button
+          onClick={handlePreview}
+          className="save-btn"
+          disabled={isSaving}
+        >
           Preview Portfolio
         </button>
         <button
           onClick={savePortfolio}
           className="save-btn"
           style={{ marginLeft: "10px" }}
+          disabled={isSaving}
         >
-          Save Portfolio
+          {isSaving ? "Saving..." : "Save Portfolio"}
         </button>
       </div>
 
@@ -520,6 +608,8 @@ function AdminPage() {
           <select value={theme} onChange={(e) => setTheme(e.target.value)}>
             <option value="light">Light</option>
             <option value="dark">Dark</option>
+            <option value="blue">Blue</option>
+            <option value="green">Green</option>
           </select>
         </div>
         <div>
@@ -566,62 +656,72 @@ function AdminPage() {
               onChange={(e) => handleContactChange("value", e.target.value)}
               style={{ flex: "1", minWidth: "200px" }}
             />
-            <button className="next-btn" onClick={handleNextContact}>
+            <button
+              className="next-btn"
+              onClick={handleNextContact}
+              disabled={isSaving}
+            >
               <FiArrowRight /> Next
             </button>
-            <button className="ok-btn" onClick={handleSaveContact}>
+            <button
+              className="ok-btn"
+              onClick={handleSaveContact}
+              disabled={isSaving}
+            >
               OK
             </button>
           </div>
         )}
+        {Object.keys(contacts).length === 0 && !addingContact && (
+          <p>No contacts added yet.</p>
+        )}
         <ul style={{ listStyle: "none", padding: 0 }}>
-          {Object.entries(contacts).map(
-            ([key, value]) =>
-              value &&
-              value.trim() !== "" && (
-                <li
-                  key={key}
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    marginBottom: "10px",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <input
-                    className="editable-item"
-                    value={key}
-                    onChange={(e) => {
-                      const newKey = e.target.value;
-                      if (newKey && newKey !== key) {
-                        const updated = { ...contacts };
-                        delete updated[key];
-                        updated[newKey] = value;
-                        setContacts(updated);
-                      }
-                    }}
-                    placeholder="Field name"
-                    style={{ flex: "1", minWidth: "150px" }}
-                  />
-                  <input
-                    className="editable-item"
-                    value={value}
-                    onChange={(e) => handleEditContact(key, e.target.value)}
-                    placeholder="Value"
-                    style={{ flex: "2", minWidth: "200px" }}
-                  />
-                  <FiTrash2
-                    onClick={() => handleDeleteContact(key)}
-                    style={{
-                      cursor: "pointer",
-                      color: "#ff4444",
-                      fontSize: "18px",
-                    }}
-                  />
-                </li>
-              )
-          )}
+          {Object.entries(contacts).map(([key, value]) => (
+            <li
+              key={key}
+              style={{
+                display: "flex",
+                gap: "10px",
+                marginBottom: "10px",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <input
+                className="editable-item"
+                value={key}
+                onChange={(e) => {
+                  const newKey = e.target.value.trim();
+                  if (newKey && newKey !== key && !contacts[newKey]) {
+                    const updated = { ...contacts };
+                    delete updated[key];
+                    updated[newKey] = value;
+                    console.log("✏️ Renaming contact key:", {
+                      [newKey]: value,
+                    });
+                    setContacts(updated);
+                  }
+                }}
+                placeholder="Field name"
+                style={{ flex: "1", minWidth: "150px" }}
+              />
+              <input
+                className="editable-item"
+                value={value}
+                onChange={(e) => handleEditContact(key, e.target.value)}
+                placeholder="Value"
+                style={{ flex: "2", minWidth: "200px" }}
+              />
+              <FiTrash2
+                onClick={() => handleDeleteContact(key)}
+                style={{
+                  cursor: "pointer",
+                  color: "#ff4444",
+                  fontSize: "18px",
+                }}
+              />
+            </li>
+          ))}
         </ul>
       </section>
 
@@ -650,21 +750,29 @@ function AdminPage() {
               onChange={(e) => setNewSkill(e.target.value)}
               style={{ flex: 1 }}
             />
-            <button className="next-btn" onClick={handleNextSkill}>
+            <button
+              className="next-btn"
+              onClick={handleNextSkill}
+              disabled={isSaving}
+            >
               <FiArrowRight /> Next
             </button>
-            <button className="ok-btn" onClick={handleSaveSkill}>
+            <button
+              className="ok-btn"
+              onClick={handleSaveSkill}
+              disabled={isSaving}
+            >
               OK
             </button>
           </div>
         )}
+        {skills.length === 0 && !addingSkill && <p>No skills added yet.</p>}
         <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
           {skills.map(
             (skill, index) =>
-              skill &&
-              skill.trim() !== "" && (
+              skill && (
                 <div
-                  key={index}
+                  key={`${skill}-${index}`}
                   style={{ display: "flex", alignItems: "center", gap: "5px" }}
                 >
                   <input
@@ -734,19 +842,30 @@ function AdminPage() {
               style={{ width: "100%", margin: "5px 0" }}
             />
             <div style={{ marginTop: "10px" }}>
-              <button className="next-btn" onClick={handleNextProject}>
+              <button
+                className="next-btn"
+                onClick={handleNextProject}
+                disabled={isSaving}
+              >
                 <FiArrowRight /> Next
               </button>
-              <button className="ok-btn" onClick={handleSaveProject}>
+              <button
+                className="ok-btn"
+                onClick={handleSaveProject}
+                disabled={isSaving}
+              >
                 OK
               </button>
             </div>
           </div>
         )}
+        {projects.length === 0 && !addingProject && (
+          <p>No projects added yet.</p>
+        )}
         <ul style={{ listStyle: "none", padding: 0 }}>
           {projects.map((p, i) => (
             <li
-              key={i}
+              key={`${p.name}-${i}`}
               style={{
                 marginBottom: "15px",
                 padding: "10px",
@@ -869,19 +988,30 @@ function AdminPage() {
               style={{ width: "100%", margin: "5px 0" }}
             />
             <div style={{ marginTop: "10px" }}>
-              <button className="next-btn" onClick={handleNextTestimonial}>
+              <button
+                className="next-btn"
+                onClick={handleNextTestimonial}
+                disabled={isSaving}
+              >
                 <FiArrowRight /> Next
               </button>
-              <button className="ok-btn" onClick={handleSaveTestimonial}>
+              <button
+                className="ok-btn"
+                onClick={handleSaveTestimonial}
+                disabled={isSaving}
+              >
                 OK
               </button>
             </div>
           </div>
         )}
+        {testimonials.length === 0 && !addingTestimonial && (
+          <p>No testimonials added yet.</p>
+        )}
         <ul style={{ listStyle: "none", padding: 0 }}>
           {testimonials.map((t, i) => (
             <li
-              key={i}
+              key={`${t.clientName}-${i}`}
               style={{
                 marginBottom: "15px",
                 padding: "15px",
