@@ -310,9 +310,9 @@ function AdminPage() {
       setContacts((prev) => {
         const updated = { ...prev, [newKey]: newContact.value || "" };
         console.log("✅ Updated contacts state:", updated);
+        savePortfolio(); // Save to backend after state update
         return updated;
       });
-      setTimeout(() => savePortfolio(), 100); // Delay savePortfolio
     }
     setNewContact({ key: "", value: "" });
     setAddingContact(false);
@@ -357,9 +357,9 @@ function AdminPage() {
       setSkills((prev) => {
         const updated = [...prev, newSkill];
         console.log("✅ Updated skills state:", updated);
+        savePortfolio(); // Save to backend after state update
         return updated;
       });
-      setTimeout(() => savePortfolio(), 100); // Delay savePortfolio
     }
     setNewSkill("");
     setAddingSkill(false);
@@ -414,9 +414,9 @@ function AdminPage() {
       setProjects((prev) => {
         const updated = [...prev, newProject];
         console.log("✅ Updated projects state:", updated);
+        savePortfolio(); // Save to backend after state update
         return updated;
       });
-      setTimeout(() => savePortfolio(), 100); // Delay savePortfolio
     }
     setNewProject({ name: "", description: "", github: "", liveDemo: "" });
     setAddingProject(false);
@@ -479,9 +479,9 @@ function AdminPage() {
       setTestimonials((prev) => {
         const updated = [...prev, newTestimonial];
         console.log("✅ Updated testimonials state:", updated);
+        savePortfolio(); // Save to backend after state update
         return updated;
       });
-      setTimeout(() => savePortfolio(), 100); // Delay savePortfolio
     }
     setNewTestimonial({
       clientName: "",
