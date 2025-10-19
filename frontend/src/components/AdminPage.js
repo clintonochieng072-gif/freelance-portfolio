@@ -103,7 +103,7 @@ function AdminPage() {
 
         const data = await res.json();
         console.log("✅ Portfolio loaded:", data);
-        setContacts(data.contacts || {});
+        setContacts({ ...data.contacts } || {});
         setSkills(data.skills || []);
         setProjects(data.projects || []);
         setTestimonials(data.testimonials || []);
@@ -145,7 +145,7 @@ function AdminPage() {
       socketRef.current.on("portfolioUpdated", ({ portfolio }) => {
         if (portfolio?.username === effectiveUsername) {
           console.log("🔄 Portfolio updated via socket:", portfolio);
-          setContacts(portfolio.contacts || {});
+          setContacts({ ...portfolio.contacts } || {});
           setSkills(portfolio.skills || []);
           setProjects(portfolio.projects || []);
           setTestimonials(portfolio.testimonials || []);
@@ -180,7 +180,7 @@ function AdminPage() {
     }
   };
 
-  // Save portfolio - ORIGINAL VERSION
+  // Save portfolio
   const savePortfolio = async () => {
     try {
       setIsSaving(true);
@@ -236,14 +236,18 @@ function AdminPage() {
       setProfilePictureUrl(data.portfolio.profilePicture || profilePictureUrl);
       setResumeUrl(data.portfolio.resumeUrl || resumeUrl);
       setProjects(data.portfolio.projects || projects);
+      setContacts({ ...data.portfolio.contacts } || {});
       socketRef.current?.emit("portfolioUpdated", {
         username: effectiveUsername,
         portfolio: data.portfolio,
       });
+
+      return data; // Return data for handleSave* functions
     } catch (err) {
       console.error("💥 Save error:", err);
       setError(`Failed to save portfolio: ${err.message}`);
       setSaveStatus("");
+      throw err; // Rethrow to handle in handleSave* functions
     } finally {
       setIsSaving(false);
     }
@@ -284,9 +288,14 @@ function AdminPage() {
         newKey = `${baseKey}_${counter}`;
         counter++;
       }
-
-      const updatedContacts = { ...contacts, [newKey]: newContact.value || "" };
-      setContacts(updatedContacts);
+      console.log("🔄 Adding contact to state:", {
+        [newKey]: newContact.value,
+      });
+      setContacts((prev) => {
+        const updated = { ...prev, [newKey]: newContact.value || "" };
+        console.log("🔄 Updated contacts state:", updated);
+        return updated;
+      });
       setNewContact({ key: "", value: "" });
     }
   };
@@ -301,73 +310,102 @@ function AdminPage() {
         newKey = `${baseKey}_${counter}`;
         counter++;
       }
-
-      const updatedContacts = { ...contacts, [newKey]: newContact.value || "" };
-      setContacts(updatedContacts);
-
-      // Save to backend immediately
-      await savePortfolio();
+      console.log("✅ Saving contact:", { [newKey]: newContact.value });
+      setContacts((prev) => {
+        const updated = { ...prev, [newKey]: newContact.value || "" };
+        console.log("✅ Updated contacts state:", updated);
+        return updated;
+      });
+      try {
+        await savePortfolio();
+        setNewContact({ key: "", value: "" });
+        setAddingContact(false);
+      } catch (err) {
+        // Keep form open on error
+        console.log("❌ Save failed, keeping form open");
+      }
+    } else {
+      setNewContact({ key: "", value: "" });
+      setAddingContact(false);
     }
-    setNewContact({ key: "", value: "" });
-    setAddingContact(false);
   };
 
-  const handleEditContact = async (key, value) => {
-    const updatedContacts = { ...contacts, [key]: value };
-    setContacts(updatedContacts);
-    // Auto-save after editing
-    await savePortfolio();
+  const handleEditContact = (key, value) => {
+    console.log("✏️ Editing contact:", { [key]: value });
+    setContacts((prev) => {
+      const updated = { ...prev, [key]: value };
+      console.log("✏️ Updated contacts state:", updated);
+      return updated;
+    });
   };
 
-  const handleDeleteContact = async (key) => {
-    const updatedContacts = { ...contacts };
-    delete updatedContacts[key];
-    setContacts(updatedContacts);
-    // Auto-save after deletion
-    await savePortfolio();
+  const handleDeleteContact = (key) => {
+    console.log("🗑️ Deleting contact:", key);
+    setContacts((prev) => {
+      const updated = { ...prev };
+      delete updated[key];
+      console.log("🗑️ Updated contacts state:", updated);
+      return updated;
+    });
   };
 
   // Skills handlers
   const handleAddSkill = () => setAddingSkill(true);
-
   const handleNextSkill = () => {
     if (newSkill?.trim()) {
-      const updatedSkills = [...skills, newSkill];
-      setSkills(updatedSkills);
+      console.log("🔄 Adding skill:", newSkill);
+      setSkills((prev) => {
+        const updated = [...prev, newSkill];
+        console.log("🔄 Updated skills state:", updated);
+        return updated;
+      });
       setNewSkill("");
     }
   };
 
   const handleSaveSkill = async () => {
     if (newSkill?.trim()) {
-      const updatedSkills = [...skills, newSkill];
-      setSkills(updatedSkills);
-
-      // Save to backend immediately
-      await savePortfolio();
+      console.log("✅ Saving skill:", newSkill);
+      setSkills((prev) => {
+        const updated = [...prev, newSkill];
+        console.log("✅ Updated skills state:", updated);
+        return updated;
+      });
+      try {
+        await savePortfolio();
+        setNewSkill("");
+        setAddingSkill(false);
+      } catch (err) {
+        // Keep form open on error
+        console.log("❌ Save failed, keeping form open");
+      }
+    } else {
+      setNewSkill("");
+      setAddingSkill(false);
     }
-    setNewSkill("");
-    setAddingSkill(false);
   };
 
-  const handleEditSkill = async (index, value) => {
-    const updatedSkills = [...skills];
-    updatedSkills[index] = value;
-    setSkills(updatedSkills);
-    // Auto-save after editing
-    await savePortfolio();
+  const handleEditSkill = (index, value) => {
+    console.log("✏️ Editing skill at index", index, ":", value);
+    setSkills((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      console.log("✏️ Updated skills state:", updated);
+      return updated;
+    });
   };
 
-  const handleDeleteSkill = async (index) => {
-    const updatedSkills = skills.filter((_, i) => i !== index);
-    setSkills(updatedSkills);
-    // Auto-save after deletion
-    await savePortfolio();
+  const handleDeleteSkill = (index) => {
+    console.log("🗑️ Deleting skill at index:", index);
+    setSkills((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      console.log("🗑️ Updated skills state:", updated);
+      return updated;
+    });
   };
 
   // Projects handlers
   const handleAddProject = () => setAddingProject(true);
-
   const handleNextProject = () => {
     if (
       newProject.name?.trim() ||
@@ -375,8 +413,12 @@ function AdminPage() {
       newProject.github?.trim() ||
       newProject.liveDemo?.trim()
     ) {
-      const updatedProjects = [...projects, newProject];
-      setProjects(updatedProjects);
+      console.log("🔄 Adding project:", newProject);
+      setProjects((prev) => {
+        const updated = [...prev, newProject];
+        console.log("🔄 Updated projects state:", updated);
+        return updated;
+      });
       setNewProject({ name: "", description: "", github: "", liveDemo: "" });
     }
   };
@@ -388,34 +430,47 @@ function AdminPage() {
       newProject.github?.trim() ||
       newProject.liveDemo?.trim()
     ) {
-      const updatedProjects = [...projects, newProject];
-      setProjects(updatedProjects);
-
-      // Save to backend immediately
-      await savePortfolio();
+      console.log("✅ Saving project:", newProject);
+      setProjects((prev) => {
+        const updated = [...prev, newProject];
+        console.log("✅ Updated projects state:", updated);
+        return updated;
+      });
+      try {
+        await savePortfolio();
+        setNewProject({ name: "", description: "", github: "", liveDemo: "" });
+        setAddingProject(false);
+      } catch (err) {
+        // Keep form open on error
+        console.log("❌ Save failed, keeping form open");
+      }
+    } else {
+      setNewProject({ name: "", description: "", github: "", liveDemo: "" });
+      setAddingProject(false);
     }
-    setNewProject({ name: "", description: "", github: "", liveDemo: "" });
-    setAddingProject(false);
   };
 
-  const handleEditProject = async (index, field, value) => {
-    const updatedProjects = [...projects];
-    updatedProjects[index] = { ...updatedProjects[index], [field]: value };
-    setProjects(updatedProjects);
-    // Auto-save after editing
-    await savePortfolio();
+  const handleEditProject = (index, field, value) => {
+    console.log("✏️ Editing project at index", index, ":", { [field]: value });
+    setProjects((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      console.log("✏️ Updated projects state:", updated);
+      return updated;
+    });
   };
 
-  const handleDeleteProject = async (index) => {
-    const updatedProjects = projects.filter((_, i) => i !== index);
-    setProjects(updatedProjects);
-    // Auto-save after deletion
-    await savePortfolio();
+  const handleDeleteProject = (index) => {
+    console.log("🗑️ Deleting project at index:", index);
+    setProjects((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      console.log("🗑️ Updated projects state:", updated);
+      return updated;
+    });
   };
 
   // Testimonials handlers
   const handleAddTestimonial = () => setAddingTestimonial(true);
-
   const handleNextTestimonial = () => {
     if (
       newTestimonial.clientName?.trim() ||
@@ -424,8 +479,12 @@ function AdminPage() {
       newTestimonial.company?.trim() ||
       newTestimonial.profilePicture?.trim()
     ) {
-      const updatedTestimonials = [...testimonials, newTestimonial];
-      setTestimonials(updatedTestimonials);
+      console.log("🔄 Adding testimonial:", newTestimonial);
+      setTestimonials((prev) => {
+        const updated = [...prev, newTestimonial];
+        console.log("🔄 Updated testimonials state:", updated);
+        return updated;
+      });
       setNewTestimonial({
         clientName: "",
         comment: "",
@@ -444,42 +503,61 @@ function AdminPage() {
       newTestimonial.company?.trim() ||
       newTestimonial.profilePicture?.trim()
     ) {
-      const updatedTestimonials = [...testimonials, newTestimonial];
-      setTestimonials(updatedTestimonials);
-
-      // Save to backend immediately
-      await savePortfolio();
+      console.log("✅ Saving testimonial:", newTestimonial);
+      setTestimonials((prev) => {
+        const updated = [...prev, newTestimonial];
+        console.log("✅ Updated testimonials state:", updated);
+        return updated;
+      });
+      try {
+        await savePortfolio();
+        setNewTestimonial({
+          clientName: "",
+          comment: "",
+          position: "",
+          company: "",
+          profilePicture: "",
+        });
+        setAddingTestimonial(false);
+      } catch (err) {
+        // Keep form open on error
+        console.log("❌ Save failed, keeping form open");
+      }
+    } else {
+      setNewTestimonial({
+        clientName: "",
+        comment: "",
+        position: "",
+        company: "",
+        profilePicture: "",
+      });
+      setAddingTestimonial(false);
     }
-    setNewTestimonial({
-      clientName: "",
-      comment: "",
-      position: "",
-      company: "",
-      profilePicture: "",
-    });
-    setAddingTestimonial(false);
   };
 
-  const handleEditTestimonial = async (index, field, value) => {
-    const updatedTestimonials = [...testimonials];
-    updatedTestimonials[index] = {
-      ...updatedTestimonials[index],
+  const handleEditTestimonial = (index, field, value) => {
+    console.log("✏️ Editing testimonial at index", index, ":", {
       [field]: value,
-    };
-    setTestimonials(updatedTestimonials);
-    // Auto-save after editing
-    await savePortfolio();
+    });
+    setTestimonials((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      console.log("✏️ Updated testimonials state:", updated);
+      return updated;
+    });
   };
 
-  const handleDeleteTestimonial = async (index) => {
-    const updatedTestimonials = testimonials.filter((_, i) => i !== index);
-    setTestimonials(updatedTestimonials);
-    // Auto-save after deletion
-    await savePortfolio();
+  const handleDeleteTestimonial = (index) => {
+    console.log("🗑️ Deleting testimonial at index:", index);
+    setTestimonials((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      console.log("🗑️ Updated testimonials state:", updated);
+      return updated;
+    });
   };
 
   // Profile handlers for components
-  const handleProfileChange = async (field, value) => {
+  const handleProfileChange = (field, value) => {
     switch (field) {
       case "displayName":
         setDisplayName(value);
@@ -496,9 +574,10 @@ function AdminPage() {
       default:
         break;
     }
-    // Auto-save profile changes after a short delay
-    setTimeout(() => savePortfolio(), 1000);
   };
+
+  // Debug contacts state before rendering
+  console.log("🎨 Rendering with contacts:", contacts);
 
   if (loading) {
     return (
@@ -638,55 +717,58 @@ function AdminPage() {
             </button>
           </div>
         )}
-        {Object.keys(contacts).length === 0 && !addingContact && (
+        {Object.keys(contacts).length === 0 ? (
           <p>No contacts added yet.</p>
-        )}
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {Object.entries(contacts).map(([key, value]) => (
-            <li
-              key={key}
-              style={{
-                display: "flex",
-                gap: "10px",
-                marginBottom: "10px",
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <input
-                className="editable-item"
-                value={key}
-                onChange={(e) => {
-                  const newKey = e.target.value.trim();
-                  if (newKey && newKey !== key && !contacts[newKey]) {
-                    const updated = { ...contacts };
-                    delete updated[key];
-                    updated[newKey] = value;
-                    setContacts(updated);
-                    savePortfolio(); // Auto-save after renaming
-                  }
-                }}
-                placeholder="Field name"
-                style={{ flex: "1", minWidth: "150px" }}
-              />
-              <input
-                className="editable-item"
-                value={value}
-                onChange={(e) => handleEditContact(key, e.target.value)}
-                placeholder="Value"
-                style={{ flex: "2", minWidth: "200px" }}
-              />
-              <FiTrash2
-                onClick={() => handleDeleteContact(key)}
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {Object.entries(contacts).map(([key, value]) => (
+              <li
+                key={key}
                 style={{
-                  cursor: "pointer",
-                  color: "#ff4444",
-                  fontSize: "18px",
+                  display: "flex",
+                  gap: "10px",
+                  marginBottom: "10px",
+                  alignItems: "center",
+                  flexWrap: "wrap",
                 }}
-              />
-            </li>
-          ))}
-        </ul>
+              >
+                <input
+                  className="editable-item"
+                  value={key}
+                  onChange={(e) => {
+                    const newKey = e.target.value.trim();
+                    if (newKey && newKey !== key && !contacts[newKey]) {
+                      const updated = { ...contacts };
+                      delete updated[key];
+                      updated[newKey] = value;
+                      console.log("✏️ Renaming contact key:", {
+                        [newKey]: value,
+                      });
+                      setContacts({ ...updated });
+                    }
+                  }}
+                  placeholder="Field name"
+                  style={{ flex: "1", minWidth: "150px" }}
+                />
+                <input
+                  className="editable-item"
+                  value={value}
+                  onChange={(e) => handleEditContact(key, e.target.value)}
+                  placeholder="Value"
+                  style={{ flex: "2", minWidth: "200px" }}
+                />
+                <FiTrash2
+                  onClick={() => handleDeleteContact(key)}
+                  style={{
+                    cursor: "pointer",
+                    color: "#ff4444",
+                    fontSize: "18px",
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* Skills Section */}
@@ -730,30 +812,37 @@ function AdminPage() {
             </button>
           </div>
         )}
-        {skills.length === 0 && !addingSkill && <p>No skills added yet.</p>}
-        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-          {skills.map(
-            (skill, index) =>
-              skill && (
-                <div
-                  key={`${skill}-${index}`}
-                  style={{ display: "flex", alignItems: "center", gap: "5px" }}
-                >
-                  <input
-                    className="editable-item"
-                    type="text"
-                    value={skill}
-                    onChange={(e) => handleEditSkill(index, e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <FiTrash2
-                    onClick={() => handleDeleteSkill(index)}
-                    style={{ cursor: "pointer", color: "#ff4444" }}
-                  />
-                </div>
-              )
-          )}
-        </div>
+        {skills.length === 0 ? (
+          <p>No skills added yet.</p>
+        ) : (
+          <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+            {skills.map(
+              (skill, index) =>
+                skill && (
+                  <div
+                    key={`${skill}-${index}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px",
+                    }}
+                  >
+                    <input
+                      className="editable-item"
+                      type="text"
+                      value={skill}
+                      onChange={(e) => handleEditSkill(index, e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <FiTrash2
+                      onClick={() => handleDeleteSkill(index)}
+                      style={{ cursor: "pointer", color: "#ff4444" }}
+                    />
+                  </div>
+                )
+            )}
+          </div>
+        )}
       </section>
 
       {/* Projects Section */}
@@ -823,58 +912,65 @@ function AdminPage() {
             </div>
           </div>
         )}
-        {projects.length === 0 && !addingProject && (
+        {projects.length === 0 ? (
           <p>No projects added yet.</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {projects.map((p, i) => (
+              <li
+                key={`${p.name}-${i}`}
+                style={{
+                  marginBottom: "15px",
+                  padding: "10px",
+                  border: "1px solid #ddd",
+                }}
+              >
+                <input
+                  className="editable-item"
+                  value={p.name}
+                  onChange={(e) => handleEditProject(i, "name", e.target.value)}
+                  placeholder="Project Name"
+                  style={{ width: "100%", margin: "5px 0" }}
+                />
+                <textarea
+                  className="editable-item"
+                  value={p.description}
+                  onChange={(e) =>
+                    handleEditProject(i, "description", e.target.value)
+                  }
+                  placeholder="Description"
+                  style={{ width: "100%", minHeight: "60px", margin: "5px 0" }}
+                />
+                <input
+                  className="editable-item"
+                  value={p.github}
+                  onChange={(e) =>
+                    handleEditProject(i, "github", e.target.value)
+                  }
+                  placeholder="GitHub Link"
+                  style={{ width: "100%", margin: "5px 0" }}
+                />
+                <input
+                  className="editable-item"
+                  value={p.liveDemo}
+                  onChange={(e) =>
+                    handleEditProject(i, "liveDemo", e.target.value)
+                  }
+                  placeholder="Live Demo Link"
+                  style={{ width: "100%", margin: "5px 0" }}
+                />
+                <FiTrash2
+                  onClick={() => handleDeleteProject(i)}
+                  style={{
+                    cursor: "pointer",
+                    color: "#ff4444",
+                    float: "right",
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
         )}
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {projects.map((p, i) => (
-            <li
-              key={`${p.name}-${i}`}
-              style={{
-                marginBottom: "15px",
-                padding: "10px",
-                border: "1px solid #ddd",
-              }}
-            >
-              <input
-                className="editable-item"
-                value={p.name}
-                onChange={(e) => handleEditProject(i, "name", e.target.value)}
-                placeholder="Project Name"
-                style={{ width: "100%", margin: "5px 0" }}
-              />
-              <textarea
-                className="editable-item"
-                value={p.description}
-                onChange={(e) =>
-                  handleEditProject(i, "description", e.target.value)
-                }
-                placeholder="Description"
-                style={{ width: "100%", minHeight: "60px", margin: "5px 0" }}
-              />
-              <input
-                className="editable-item"
-                value={p.github}
-                onChange={(e) => handleEditProject(i, "github", e.target.value)}
-                placeholder="GitHub Link"
-                style={{ width: "100%", margin: "5px 0" }}
-              />
-              <input
-                className="editable-item"
-                value={p.liveDemo}
-                onChange={(e) =>
-                  handleEditProject(i, "liveDemo", e.target.value)
-                }
-                placeholder="Live Demo Link"
-                style={{ width: "100%", margin: "5px 0" }}
-              />
-              <FiTrash2
-                onClick={() => handleDeleteProject(i)}
-                style={{ cursor: "pointer", color: "#ff4444", float: "right" }}
-              />
-            </li>
-          ))}
-        </ul>
       </section>
 
       {/* Testimonials Section */}
@@ -969,71 +1065,76 @@ function AdminPage() {
             </div>
           </div>
         )}
-        {testimonials.length === 0 && !addingTestimonial && (
+        {testimonials.length === 0 ? (
           <p>No testimonials added yet.</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {testimonials.map((t, i) => (
+              <li
+                key={`${t.clientName}-${i}`}
+                style={{
+                  marginBottom: "15px",
+                  padding: "15px",
+                  border: "1px solid #ddd",
+                }}
+              >
+                <input
+                  className="editable-item"
+                  value={t.clientName}
+                  onChange={(e) =>
+                    handleEditTestimonial(i, "clientName", e.target.value)
+                  }
+                  placeholder="Client Name"
+                  style={{ width: "100%", margin: "5px 0" }}
+                />
+                <textarea
+                  className="editable-item"
+                  value={t.comment}
+                  onChange={(e) =>
+                    handleEditTestimonial(i, "comment", e.target.value)
+                  }
+                  placeholder="Client Comment"
+                  style={{ width: "100%", minHeight: "80px", margin: "5px 0" }}
+                />
+                <input
+                  className="editable-item"
+                  value={t.position}
+                  onChange={(e) =>
+                    handleEditTestimonial(i, "position", e.target.value)
+                  }
+                  placeholder="Client Position"
+                  style={{ width: "100%", margin: "5px 0" }}
+                />
+                <input
+                  className="editable-item"
+                  value={t.company}
+                  onChange={(e) =>
+                    handleEditTestimonial(i, "company", e.target.value)
+                  }
+                  placeholder="Client Company"
+                  style={{ width: "100%", margin: "5px 0" }}
+                />
+                <input
+                  className="editable-item"
+                  value={t.profilePicture}
+                  onChange={(e) =>
+                    handleEditTestimonial(i, "profilePicture", e.target.value)
+                  }
+                  placeholder="Profile Picture URL"
+                  style={{ width: "100%", margin: "5px 0" }}
+                />
+                <FiTrash2
+                  onClick={() => handleDeleteTestimonial(i)}
+                  style={{
+                    cursor: "pointer",
+                    color: "#ff4444",
+                    float: "right",
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
         )}
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {testimonials.map((t, i) => (
-            <li
-              key={`${t.clientName}-${i}`}
-              style={{
-                marginBottom: "15px",
-                padding: "15px",
-                border: "1px solid #ddd",
-              }}
-            >
-              <input
-                className="editable-item"
-                value={t.clientName}
-                onChange={(e) =>
-                  handleEditTestimonial(i, "clientName", e.target.value)
-                }
-                placeholder="Client Name"
-                style={{ width: "100%", margin: "5px 0" }}
-              />
-              <textarea
-                className="editable-item"
-                value={t.comment}
-                onChange={(e) =>
-                  handleEditTestimonial(i, "comment", e.target.value)
-                }
-                placeholder="Client Comment"
-                style={{ width: "100%", minHeight: "80px", margin: "5px 0" }}
-              />
-              <input
-                className="editable-item"
-                value={t.position}
-                onChange={(e) =>
-                  handleEditTestimonial(i, "position", e.target.value)
-                }
-                placeholder="Client Position"
-                style={{ width: "100%", margin: "5px 0" }}
-              />
-              <input
-                className="editable-item"
-                value={t.company}
-                onChange={(e) =>
-                  handleEditTestimonial(i, "company", e.target.value)
-                }
-                placeholder="Client Company"
-                style={{ width: "100%", margin: "5px 0" }}
-              />
-              <input
-                className="editable-item"
-                value={t.profilePicture}
-                onChange={(e) =>
-                  handleEditTestimonial(i, "profilePicture", e.target.value)
-                }
-                placeholder="Profile Picture URL"
-                style={{ width: "100%", margin: "5px 0" }}
-              />
-              <FiTrash2
-                onClick={() => handleDeleteTestimonial(i)}
-                style={{ cursor: "pointer", color: "#ff4444", float: "right" }}
-              />
-            </li>
-          ))}
-        </ul>
       </section>
     </div>
   );

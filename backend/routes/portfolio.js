@@ -20,7 +20,7 @@ const upload = multer({ storage }).fields([
   { name: "resumeFile", maxCount: 1 },
 ]);
 
-// ✅ ROOT ROUTE - Get authenticated user's portfolio
+// ROOT ROUTE - Get authenticated user's portfolio
 router.get("/", authMiddleware, async (req, res) => {
   try {
     console.log(
@@ -46,7 +46,7 @@ router.get("/", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ PUBLIC ROUTE - Get portfolio by username (no auth required)
+// PUBLIC ROUTE - Get portfolio by username (no auth required)
 router.get("/:username", async (req, res) => {
   try {
     const { username } = req.params;
@@ -91,7 +91,7 @@ router.get("/:username", async (req, res) => {
   }
 });
 
-// ✅ Get client's own portfolio (Protected)
+// Get client's own portfolio (Protected)
 router.get("/me/portfolio", authMiddleware, async (req, res) => {
   try {
     const portfolio = await Portfolio.findOne({ username: req.user.username });
@@ -107,7 +107,7 @@ router.get("/me/portfolio", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Update portfolio (Client's own portfolio only)
+// Update portfolio (Client's own portfolio only)
 router.put("/update", authMiddleware, upload, async (req, res) => {
   try {
     const {
@@ -120,7 +120,7 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
       bio,
       theme,
       isPublished,
-      resumeUrl, // Added to fix ReferenceError
+      resumeUrl,
     } = req.body;
 
     let portfolio = await Portfolio.findOne({ username: req.user.username });
@@ -142,13 +142,15 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
     if (theme !== undefined) portfolio.theme = theme || "light";
     if (isPublished !== undefined)
       portfolio.isPublished = isPublished === "true";
+
+    // Handle file uploads
     if (req.files?.profilePicture) {
       portfolio.profilePicture = `/uploads/${req.files.profilePicture[0].filename}`;
     }
     if (req.files?.resumeFile) {
       portfolio.resumeUrl = `/uploads/${req.files.resumeFile[0].filename}`;
-    } else if (resumeUrl !== undefined && resumeUrl !== "") {
-      portfolio.resumeUrl = resumeUrl; // Use provided URL if no file uploaded
+    } else if (resumeUrl !== undefined) {
+      portfolio.resumeUrl = resumeUrl || "";
     }
 
     const savedPortfolio = await portfolio.save();
