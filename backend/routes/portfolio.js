@@ -110,6 +110,9 @@ router.get("/me/portfolio", authMiddleware, async (req, res) => {
 // ✅ Update portfolio (Client's own portfolio only)
 router.put("/update", authMiddleware, upload, async (req, res) => {
   try {
+    console.log("📡 Portfolio update request received for:", req.user.username);
+    console.log("📦 Request body fields:", Object.keys(req.body));
+
     const {
       contacts,
       skills,
@@ -120,7 +123,7 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
       bio,
       theme,
       isPublished,
-      resumeUrl, // Added to fix ReferenceError
+      resumeUrl,
     } = req.body;
 
     let portfolio = await Portfolio.findOne({ username: req.user.username });
@@ -129,29 +132,43 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
       return res.status(404).json({ error: "Portfolio not found" });
     }
 
-    // Update portfolio fields
-    if (contacts !== undefined) portfolio.contacts = JSON.parse(contacts) || {};
-    if (skills !== undefined)
-      portfolio.skills = JSON.parse(skills).filter((s) => s && s.trim() !== "");
-    if (projects !== undefined) portfolio.projects = JSON.parse(projects) || [];
-    if (testimonials !== undefined)
-      portfolio.testimonials = JSON.parse(testimonials) || [];
+    // Update portfolio fields with proper error handling
+    try {
+      if (contacts !== undefined)
+        portfolio.contacts = JSON.parse(contacts) || {};
+      if (skills !== undefined)
+        portfolio.skills = JSON.parse(skills).filter(
+          (s) => s && s.trim() !== ""
+        );
+      if (projects !== undefined)
+        portfolio.projects = JSON.parse(projects) || [];
+      if (testimonials !== undefined)
+        portfolio.testimonials = JSON.parse(testimonials) || [];
+    } catch (parseError) {
+      console.error("❌ JSON parsing error:", parseError);
+      return res.status(400).json({ error: "Invalid data format" });
+    }
+
     if (displayName !== undefined) portfolio.displayName = displayName || "";
     if (title !== undefined) portfolio.title = title || "";
     if (bio !== undefined) portfolio.bio = bio || "";
     if (theme !== undefined) portfolio.theme = theme || "light";
     if (isPublished !== undefined)
       portfolio.isPublished = isPublished === "true";
+
+    // Handle file uploads
     if (req.files?.profilePicture) {
       portfolio.profilePicture = `/uploads/${req.files.profilePicture[0].filename}`;
     }
     if (req.files?.resumeFile) {
       portfolio.resumeUrl = `/uploads/${req.files.resumeFile[0].filename}`;
-    } else if (resumeUrl !== undefined && resumeUrl !== "") {
-      portfolio.resumeUrl = resumeUrl; // Use provided URL if no file uploaded
+    } else if (resumeUrl !== undefined) {
+      portfolio.resumeUrl = resumeUrl || "";
     }
 
+    console.log("💾 Saving portfolio to database...");
     const savedPortfolio = await portfolio.save();
+    console.log("✅ Portfolio saved successfully");
 
     // Emit socket event for real-time updates
     const io = req.app.get("io");
@@ -168,8 +185,8 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
       portfolio: savedPortfolio.toObject(),
     });
   } catch (err) {
-    console.error("Error updating portfolio:", err);
-    res.status(500).json({ error: "Error updating portfolio" });
+    console.error("💥 Error updating portfolio:", err);
+    res.status(500).json({ error: "Error updating portfolio: " + err.message });
   }
 });
 

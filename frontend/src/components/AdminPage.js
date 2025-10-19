@@ -180,12 +180,17 @@ function AdminPage() {
     }
   };
 
-  // Save portfolio
   const savePortfolio = async () => {
     try {
       setIsSaving(true);
       setSaveStatus("Saving...");
       setError("");
+
+      console.log("💾 Starting portfolio save...");
+      console.log("📊 Current contacts:", contacts);
+      console.log("📊 Current skills:", skills);
+      console.log("📊 Current projects:", projects);
+
       const formData = new FormData();
       formData.append("contacts", JSON.stringify(contacts));
       formData.append(
@@ -199,6 +204,7 @@ function AdminPage() {
       formData.append("bio", bio || "");
       formData.append("theme", theme);
       formData.append("isPublished", isPublished);
+
       if (profilePicture) {
         formData.append("profilePicture", profilePicture);
       }
@@ -208,7 +214,7 @@ function AdminPage() {
         formData.append("resumeUrl", resumeUrl || "");
       }
 
-      console.log("📡 Sending portfolio save with contacts:", contacts);
+      console.log("📡 Sending portfolio save request...");
 
       const res = await fetch(`${API_URL}/portfolio/update`, {
         method: "PUT",
@@ -228,14 +234,16 @@ function AdminPage() {
       }
 
       const data = await res.json();
-      console.log("✅ Portfolio saved:", data);
+      console.log("✅ Portfolio saved successfully:", data);
       setSaveStatus("Saved ✓");
       setTimeout(() => setSaveStatus(""), 2000);
       setError("");
 
+      // Update local state with saved data
       setProfilePictureUrl(data.portfolio.profilePicture || profilePictureUrl);
       setResumeUrl(data.portfolio.resumeUrl || resumeUrl);
-      setProjects(data.portfolio.projects || projects);
+
+      // Emit socket update
       socketRef.current?.emit("portfolioUpdated", {
         username: effectiveUsername,
         portfolio: data.portfolio,
