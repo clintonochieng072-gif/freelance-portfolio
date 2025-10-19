@@ -24,7 +24,7 @@ function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("");
   const [error, setError] = useState("");
-  const [isSaving, setIsSaving] = useState(false); // New: Track saving state
+  const [isSaving, setIsSaving] = useState(false);
 
   // Portfolio states
   const [contacts, setContacts] = useState({});
@@ -183,9 +183,9 @@ function AdminPage() {
   // Save portfolio
   const savePortfolio = async () => {
     try {
-      setIsSaving(true); // Disable buttons during save
+      setIsSaving(true);
       setSaveStatus("Saving...");
-      setError(""); // Clear previous errors
+      setError("");
       const formData = new FormData();
       formData.append("contacts", JSON.stringify(contacts));
       formData.append(
@@ -245,7 +245,7 @@ function AdminPage() {
       setError(`Failed to save portfolio: ${err.message}`);
       setSaveStatus("");
     } finally {
-      setIsSaving(false); // Re-enable buttons
+      setIsSaving(false);
     }
   };
 
@@ -281,7 +281,7 @@ function AdminPage() {
       let newKey = baseKey;
       let counter = 1;
       while (contacts[newKey]) {
-        newKey = `${baseKey}_${counter}`; // Append suffix for uniqueness
+        newKey = `${baseKey}_${counter}`;
         counter++;
       }
       console.log("🔄 Adding contact to state:", {
@@ -303,7 +303,7 @@ function AdminPage() {
       let newKey = baseKey;
       let counter = 1;
       while (contacts[newKey]) {
-        newKey = `${baseKey}_${counter}`; // Append suffix for uniqueness
+        newKey = `${baseKey}_${counter}`;
         counter++;
       }
       console.log("✅ Saving contact:", { [newKey]: newContact.value });
@@ -312,10 +312,10 @@ function AdminPage() {
         console.log("✅ Updated contacts state:", updated);
         return updated;
       });
-      setNewContact({ key: "", value: "" });
+      setTimeout(() => savePortfolio(), 100); // Delay savePortfolio
     }
+    setNewContact({ key: "", value: "" });
     setAddingContact(false);
-    savePortfolio();
   };
 
   const handleEditContact = (key, value) => {
@@ -359,10 +359,10 @@ function AdminPage() {
         console.log("✅ Updated skills state:", updated);
         return updated;
       });
+      setTimeout(() => savePortfolio(), 100); // Delay savePortfolio
     }
     setNewSkill("");
     setAddingSkill(false);
-    savePortfolio();
   };
 
   const handleEditSkill = (index, value) => {
@@ -416,10 +416,10 @@ function AdminPage() {
         console.log("✅ Updated projects state:", updated);
         return updated;
       });
+      setTimeout(() => savePortfolio(), 100); // Delay savePortfolio
     }
     setNewProject({ name: "", description: "", github: "", liveDemo: "" });
     setAddingProject(false);
-    savePortfolio();
   };
 
   const handleEditProject = (index, field, value) => {
@@ -481,6 +481,7 @@ function AdminPage() {
         console.log("✅ Updated testimonials state:", updated);
         return updated;
       });
+      setTimeout(() => savePortfolio(), 100); // Delay savePortfolio
     }
     setNewTestimonial({
       clientName: "",
@@ -490,7 +491,6 @@ function AdminPage() {
       profilePicture: "",
     });
     setAddingTestimonial(false);
-    savePortfolio();
   };
 
   const handleEditTestimonial = (index, field, value) => {
