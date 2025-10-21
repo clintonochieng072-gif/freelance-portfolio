@@ -180,6 +180,20 @@ function AdminPage() {
     }
   };
 
+  // Handle resume deletion
+  const handleDeleteResume = async () => {
+    console.log("🗑️ Deleting resume");
+    setResumeFile(null);
+    setResumeUrl("");
+    try {
+      await savePortfolio();
+      console.log("✅ Resume deleted and portfolio saved");
+    } catch (err) {
+      console.error("❌ Error deleting resume:", err);
+      setError("Failed to delete resume");
+    }
+  };
+
   // Save portfolio
   const savePortfolio = async () => {
     try {
@@ -647,6 +661,7 @@ function AdminPage() {
           portfolio={{ resumeUrl, resumeFile }}
           onChange={handleProfileChange}
           onFileChange={handleResumeFileChange}
+          onDeleteResume={handleDeleteResume}
         />
         <div>
           <h3>Theme</h3>
@@ -759,11 +774,7 @@ function AdminPage() {
                 />
                 <FiTrash2
                   onClick={() => handleDeleteContact(key)}
-                  style={{
-                    cursor: "pointer",
-                    color: "#ff4444",
-                    fontSize: "18px",
-                  }}
+                  className="delete-icon"
                 />
               </li>
             ))}
@@ -836,7 +847,7 @@ function AdminPage() {
                     />
                     <FiTrash2
                       onClick={() => handleDeleteSkill(index)}
-                      style={{ cursor: "pointer", color: "#ff4444" }}
+                      className="delete-icon"
                     />
                   </div>
                 )
@@ -961,11 +972,7 @@ function AdminPage() {
                 />
                 <FiTrash2
                   onClick={() => handleDeleteProject(i)}
-                  style={{
-                    cursor: "pointer",
-                    color: "#ff4444",
-                    float: "right",
-                  }}
+                  className="delete-icon"
                 />
               </li>
             ))}
@@ -1125,11 +1132,7 @@ function AdminPage() {
                 />
                 <FiTrash2
                   onClick={() => handleDeleteTestimonial(i)}
-                  style={{
-                    cursor: "pointer",
-                    color: "#ff4444",
-                    float: "right",
-                  }}
+                  className="delete-icon"
                 />
               </li>
             ))}

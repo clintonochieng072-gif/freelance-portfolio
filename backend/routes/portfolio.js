@@ -7,7 +7,7 @@ const path = require("path");
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: "./uploads/",
+  destination: "./Uploads/",
   filename: (req, file, cb) => {
     cb(
       null,
@@ -148,7 +148,7 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
       portfolio.profilePicture = `/uploads/${req.files.profilePicture[0].filename}`;
     }
     if (req.files?.resumeFile) {
-      portfolio.resumeUrl = `/uploads/${req.files.resumeFile[0].filename}`;
+      portfolio.resumeUrl = `/Uploads/${req.files.resumeFile[0].filename}`;
     } else if (resumeUrl !== undefined) {
       portfolio.resumeUrl = resumeUrl || "";
     }
