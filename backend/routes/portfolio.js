@@ -15,7 +15,11 @@ const storage = multer.diskStorage({
     );
   },
 });
-const upload = multer({ storage }).fields([
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+}).fields([
   { name: "profilePicture", maxCount: 1 },
   { name: "resumeFile", maxCount: 1 },
 ]);
@@ -145,12 +149,16 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
 
     // Handle file uploads
     if (req.files?.profilePicture) {
-      portfolio.profilePicture = `/uploads/${req.files.profilePicture[0].filename}`;
+      portfolio.profilePicture = `/Uploads/${req.files.profilePicture[0].filename}`;
     }
     if (req.files?.resumeFile) {
       portfolio.resumeUrl = `/Uploads/${req.files.resumeFile[0].filename}`;
+      console.log(
+        `📄 Resume uploaded: ${portfolio.resumeUrl}, MIME: ${req.files.resumeFile[0].mimetype}`
+      );
     } else if (resumeUrl !== undefined) {
       portfolio.resumeUrl = resumeUrl || "";
+      console.log(`📄 Resume URL updated: ${portfolio.resumeUrl}`);
     }
 
     const savedPortfolio = await portfolio.save();
@@ -171,7 +179,7 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
     });
   } catch (err) {
     console.error("Error updating portfolio:", err);
-    res.status(500).json({ error: "Error updating portfolio" });
+    res.status(500).json({ error: err.message || "Error updating portfolio" });
   }
 });
 

@@ -156,6 +156,7 @@ function AdminPage() {
           setResumeUrl(portfolio.resumeUrl || "");
           setTheme(portfolio.theme || "light");
           setIsPublished(portfolio.isPublished || false);
+          setResumeFile(null); // Ensure resumeFile is cleared on update
         }
       });
 
@@ -177,20 +178,24 @@ function AdminPage() {
     if (file) {
       setResumeFile(file);
       setResumeUrl(URL.createObjectURL(file));
+    } else {
+      setError("No file selected");
     }
   };
 
   // Handle resume deletion
   const handleDeleteResume = async () => {
     console.log("🗑️ Deleting resume");
-    setResumeFile(null);
-    setResumeUrl("");
-    try {
-      await savePortfolio();
-      console.log("✅ Resume deleted and portfolio saved");
-    } catch (err) {
-      console.error("❌ Error deleting resume:", err);
-      setError("Failed to delete resume");
+    if (window.confirm("Are you sure you want to delete the resume?")) {
+      setResumeFile(null);
+      setResumeUrl("");
+      try {
+        await savePortfolio();
+        console.log("✅ Resume deleted and portfolio saved");
+      } catch (err) {
+        console.error("❌ Error deleting resume:", err);
+        setError("Failed to delete resume. Please try again.");
+      }
     }
   };
 
@@ -223,6 +228,7 @@ function AdminPage() {
       }
 
       console.log("📡 Sending portfolio save with contacts:", contacts);
+      console.log("📄 Sending resumeUrl:", resumeUrl);
 
       const res = await fetch(`${API_URL}/portfolio/update`, {
         method: "PUT",
@@ -248,7 +254,7 @@ function AdminPage() {
       setError("");
 
       setProfilePictureUrl(data.portfolio.profilePicture || profilePictureUrl);
-      setResumeUrl(data.portfolio.resumeUrl || resumeUrl);
+      setResumeUrl(data.portfolio.resumeUrl || "");
       setProjects(data.portfolio.projects || projects);
       setContacts({ ...data.portfolio.contacts } || {});
       socketRef.current?.emit("portfolioUpdated", {
@@ -256,12 +262,12 @@ function AdminPage() {
         portfolio: data.portfolio,
       });
 
-      return data; // Return data for handleSave* functions
+      return data;
     } catch (err) {
       console.error("💥 Save error:", err);
       setError(`Failed to save portfolio: ${err.message}`);
       setSaveStatus("");
-      throw err; // Rethrow to handle in handleSave* functions
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -335,7 +341,6 @@ function AdminPage() {
         setNewContact({ key: "", value: "" });
         setAddingContact(false);
       } catch (err) {
-        // Keep form open on error
         console.log("❌ Save failed, keeping form open");
       }
     } else {
@@ -390,7 +395,6 @@ function AdminPage() {
         setNewSkill("");
         setAddingSkill(false);
       } catch (err) {
-        // Keep form open on error
         console.log("❌ Save failed, keeping form open");
       }
     } else {
@@ -455,7 +459,6 @@ function AdminPage() {
         setNewProject({ name: "", description: "", github: "", liveDemo: "" });
         setAddingProject(false);
       } catch (err) {
-        // Keep form open on error
         console.log("❌ Save failed, keeping form open");
       }
     } else {
@@ -534,7 +537,6 @@ function AdminPage() {
         });
         setAddingTestimonial(false);
       } catch (err) {
-        // Keep form open on error
         console.log("❌ Save failed, keeping form open");
       }
     } else {
