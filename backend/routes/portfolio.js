@@ -149,10 +149,10 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
 
     // Handle file uploads
     if (req.files?.profilePicture) {
-      portfolio.profilePicture = `/Uploads/${req.files.profilePicture[0].filename}`;
+      portfolio.profilePicture = `/uploads/${req.files.profilePicture[0].filename}`;
     }
     if (req.files?.resumeFile) {
-      portfolio.resumeUrl = `/Uploads/${req.files.resumeFile[0].filename}`;
+      portfolio.resumeUrl = `/uploads/${req.files.resumeFile[0].filename}`;
       console.log(
         `📄 Resume uploaded: ${portfolio.resumeUrl}, MIME: ${req.files.resumeFile[0].mimetype}`
       );
