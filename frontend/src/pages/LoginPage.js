@@ -14,7 +14,7 @@ function LoginPage() {
   const { login } = useGlobalContext();
   const navigate = useNavigate();
 
-  const handleLogin = async (e, isRetry = false) => {
+  const handleLogin = async (e, retryCount = 0) => {
     e.preventDefault();
     if (loading) return;
     setLoading(true);
@@ -24,7 +24,7 @@ function LoginPage() {
       console.log("🔄 Login attempt for:", email);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30 seconds
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // Increased to 60 seconds
 
       const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
@@ -64,21 +64,30 @@ function LoginPage() {
         localStorage.removeItem("user");
       }
     } catch (err) {
-      console.error("💥 Login error:", err);
-
-      if (err.name === "AbortError" && !isRetry) {
-        console.warn("Retrying login due to timeout");
-        setMessage("⚠️ Server is starting, retrying...");
-        setTimeout(() => handleLogin(e, true), 1000); // Retry after 1 second
-      } else if (err.name === "AbortError") {
-        setMessage("⚠️ Login timeout - please try again");
+      if (err.name === "AbortError") {
+        console.warn("Login timed out");
+        if (retryCount < 3) {
+          // Up to 3 retries
+          const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.log(
+            `Retrying login (attempt ${
+              retryCount + 1
+            }) after ${delay}ms due to timeout`
+          );
+          setMessage(`⚠️ Server is starting, retrying in ${delay / 1000}s...`);
+          setTimeout(() => handleLogin(e, retryCount + 1), delay);
+          return; // Don't reset loading yet
+        } else {
+          setMessage("⚠️ Login timeout after retries - please try again later");
+        }
       } else if (err.name === "TypeError" && err.message.includes("fetch")) {
         setMessage("⚠️ Network error - check connection and try again");
       } else {
         setMessage(`❌ ${err.message || "Login failed"}`);
       }
+      console.error("💥 Login error:", err);
     } finally {
-      if (!isRetry) setLoading(false); // Only reset on initial attempt
+      setLoading(false); // Reset only after all retries
     }
   };
 
@@ -87,7 +96,7 @@ function LoginPage() {
       <div className="auth-card">
         <h2>Sign In to Your Portfolio</h2>
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={(e) => handleLogin(e, 0)}>
           <input
             type="email"
             placeholder="Email Address"
