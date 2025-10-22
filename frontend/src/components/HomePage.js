@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { jsPDF } from "jspdf";
-import IntroductionSection from "./IntroductionSection";
 import AboutSection from "./AboutSection";
 import ProfilePictureSection from "./ProfilePictureSection";
 import ResumeSection from "./ResumeSection";
@@ -275,9 +274,19 @@ function HomePage() {
   const safeTestimonials = Array.isArray(portfolio.testimonials)
     ? portfolio.testimonials
     : [];
+
+  // Check if sections have data
+  const hasProfilePicture =
+    portfolio.profilePicture && portfolio.profilePicture.trim() !== "";
   const hasDisplayName =
     portfolio.displayName && portfolio.displayName.trim() !== "";
   const hasTitle = portfolio.title && portfolio.title.trim() !== "";
+  const hasBio = portfolio.bio && portfolio.bio.trim() !== "";
+  const hasResume = portfolio.resumeUrl && portfolio.resumeUrl.trim() !== "";
+  const hasContacts = Object.keys(safeContacts).length > 0;
+  const hasSkills = safeSkills.length > 0;
+  const hasProjects = safeProjects.length > 0;
+  const hasTestimonials = safeTestimonials.length > 0;
 
   // Helper to check if value is a URL
   const isUrl = (value) => {
@@ -289,30 +298,44 @@ function HomePage() {
 
   return (
     <div className={`App ${portfolio.theme === "dark" ? "dark-mode" : ""}`}>
-      {/* Header with Introduction, Profile Picture, Name, Title, About */}
-      <header
-        className="portfolio-header"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "20px",
-          marginBottom: "40px",
-        }}
-      >
-        <ProfilePictureSection isAdmin={false} portfolio={portfolio} />
-        <div>
-          <IntroductionSection isAdmin={false} portfolio={portfolio} />
-          {hasDisplayName && <h1>{portfolio.displayName}</h1>}
-          {hasTitle && <p className="portfolio-title">{portfolio.title}</p>}
-          <AboutSection isAdmin={false} portfolio={portfolio} />
-        </div>
-      </header>
+      {/* Header Section - Only show if there's profile picture OR name/title data */}
+      {(hasProfilePicture || hasDisplayName || hasTitle || hasBio) && (
+        <header
+          className="portfolio-header"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "20px",
+            marginBottom: "40px",
+          }}
+        >
+          {/* Profile Picture - Only show if exists */}
+          {hasProfilePicture && (
+            <ProfilePictureSection isAdmin={false} portfolio={portfolio} />
+          )}
 
-      {/* Resume */}
-      <ResumeSection isAdmin={false} portfolio={portfolio} />
+          <div>
+            {/* Introduction Section - Only show if name or title exists */}
+            {(hasDisplayName || hasTitle) && (
+              <div>
+                {hasDisplayName && <h1>{portfolio.displayName}</h1>}
+                {hasTitle && (
+                  <p className="portfolio-title">{portfolio.title}</p>
+                )}
+              </div>
+            )}
 
-      {/* Contacts - Show only if has data */}
-      {Object.keys(safeContacts).length > 0 && (
+            {/* About Section - Only show if bio exists */}
+            {hasBio && <AboutSection isAdmin={false} portfolio={portfolio} />}
+          </div>
+        </header>
+      )}
+
+      {/* Resume Section - Only show if resume exists */}
+      {hasResume && <ResumeSection isAdmin={false} portfolio={portfolio} />}
+
+      {/* Contacts - Only show if has data */}
+      {hasContacts && (
         <section className="section">
           <h2>Contact Information</h2>
           <ul className="contacts-list">
@@ -336,8 +359,8 @@ function HomePage() {
         </section>
       )}
 
-      {/* Skills - Show only if has data */}
-      {safeSkills.length > 0 && (
+      {/* Skills - Only show if has data */}
+      {hasSkills && (
         <section className="section">
           <h2>Skills & Expertise</h2>
           <div className="skills-grid">
@@ -354,8 +377,8 @@ function HomePage() {
         </section>
       )}
 
-      {/* Projects - Show only if has data */}
-      {safeProjects.length > 0 && (
+      {/* Projects - Only show if has data */}
+      {hasProjects && (
         <section className="section">
           <h2>Projects</h2>
           <div className="projects-list">
@@ -396,8 +419,8 @@ function HomePage() {
         </section>
       )}
 
-      {/* Testimonials - Show only if has data */}
-      {safeTestimonials.length > 0 && (
+      {/* Testimonials - Only show if has data */}
+      {hasTestimonials && (
         <section className="section">
           <h2>Client Testimonials</h2>
           <div className="testimonials-list">
@@ -443,24 +466,26 @@ function HomePage() {
         </section>
       )}
 
-      {/* Download Portfolio Button */}
-      <section className="section">
-        <button
-          onClick={handleDownloadPDF}
-          className="download-btn"
-          style={{
-            padding: "10px 20px",
-            backgroundColor: "#007bff",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            marginTop: "20px",
-          }}
-        >
-          Download Portfolio as PDF
-        </button>
-      </section>
+      {/* Download Portfolio Button - Always show if portfolio exists */}
+      {portfolio && (
+        <section className="section">
+          <button
+            onClick={handleDownloadPDF}
+            className="download-btn"
+            style={{
+              padding: "10px 20px",
+              backgroundColor: "#007bff",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              marginTop: "20px",
+            }}
+          >
+            Download Portfolio as PDF
+          </button>
+        </section>
+      )}
 
       <footer className="portfolio-footer">
         <p>Powered by PortfolioPro</p>
