@@ -6,6 +6,7 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
+const compression = require("compression");
 
 const authRoutes = require("./routes/auth");
 const portfolioRoutes = require("./routes/portfolio");
@@ -20,6 +21,10 @@ console.log("- JWT_SECRET exists:", !!process.env.JWT_SECRET);
 console.log("- JWT_SECRET length:", process.env.JWT_SECRET?.length);
 console.log("- MONGODB_URI exists:", !!process.env.MONGODB_URI);
 console.log("- FRONTEND_URL:", process.env.FRONTEND_URL);
+console.log(
+  "- CLOUDINARY_CLOUD_NAME:",
+  process.env.CLOUDINARY_CLOUD_NAME || "NOT SET"
+);
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -32,15 +37,22 @@ const allowedOrigins = [
 
 console.log("✅ Allowed origins:", allowedOrigins);
 
+// Compression middleware for faster responses
+app.use(compression());
+
 app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin) {
-        console.log("🌐 Allowing request with no origin");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("🌐 Allowing request with no origin");
+        }
         return callback(null, true);
       }
       if (allowedOrigins.includes(origin)) {
-        console.log("✅ CORS allowed:", origin);
+        if (process.env.NODE_ENV !== "production") {
+          console.log("✅ CORS allowed:", origin);
+        }
         callback(null, true);
       } else {
         console.warn("❌ CORS blocked:", origin);
@@ -65,11 +77,19 @@ app.use((req, res, next) => {
   const method = req.method;
   const path = req.path;
   const origin = req.headers.origin || "direct";
-  console.log(`${timestamp} - ${method} ${path} - Origin: ${origin}`);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`${timestamp} - ${method} ${path} - Origin: ${origin}`);
+  }
+
   if (req.cookies?.token) {
-    console.log("🍪 Token cookie present");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("🍪 Token cookie present");
+    }
   } else if (req.headers.authorization) {
-    console.log("🔑 Authorization header present");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("🔑 Authorization header present");
+    }
   }
   next();
 });
@@ -85,6 +105,11 @@ app.get("/", (req, res) => {
     version: "1.0.0",
     environment: process.env.NODE_ENV,
     allowedOrigins,
+    features: {
+      cloudinary: !!process.env.CLOUDINARY_CLOUD_NAME,
+      compression: true,
+      caching: true,
+    },
   });
 });
 
@@ -97,6 +122,8 @@ app.get("/api", (req, res) => {
       portfolio: "/api/portfolio",
       admin: "/api/admin",
     },
+    health: "/api/health",
+    fast_health: "/api/health/fast",
   });
 });
 
@@ -107,6 +134,20 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
     jwtSecretLoaded: !!process.env.JWT_SECRET,
+    cloudinaryConfigured: !!process.env.CLOUDINARY_CLOUD_NAME,
+    database:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    uptime: process.uptime(),
+  });
+});
+
+// Fast health check endpoint for load balancers
+app.get("/api/health/fast", (req, res) => {
+  res.json({
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    database:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
   });
 });
 
@@ -164,14 +205,21 @@ io.on("connection", (socket) => {
   });
 });
 
+// OPTIMIZED MONGODB CONNECTION - REMOVED INDEX CREATION THAT CAUSED CRASH
 mongoose
   .connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 30000,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    maxPoolSize: 10,
+    minPoolSize: 1,
   })
   .then(() => {
     console.log("✅ MongoDB Atlas connected successfully");
+    console.log(
+      "📊 Database indexes will be created automatically on first use"
+    );
   })
   .catch((err) => {
     console.error("❌ MongoDB connection error:", err);
@@ -220,11 +268,18 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Allowed origins:`, allowedOrigins);
   console.log(`📍 Available routes:`);
   console.log(`   - GET  /api/health`);
+  console.log(`   - GET  /api/health/fast (optimized)`);
   console.log(`   - POST /api/auth/login`);
   console.log(`   - GET  /api/auth/me`);
   console.log(`   - GET  /api/portfolio/*`);
   console.log(`   - GET  /api/admin/*`);
   console.log(`🔌 Socket.io enabled with polling fallback`);
+  console.log(
+    `📁 Cloudinary: ${
+      process.env.CLOUDINARY_CLOUD_NAME ? "✅ Configured" : "❌ Not configured"
+    }`
+  );
+  console.log(`⚡ Performance: Compression enabled, Caching active`);
   if (process.env.NODE_ENV !== "production") {
     console.log(`🔑 JWT_SECRET length: ${process.env.JWT_SECRET?.length}`);
   }

@@ -1,9 +1,12 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+// Cache for auth tokens
+const authCache = new Map();
+const AUTH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 const authMiddleware = async (req, res, next) => {
   try {
-    // Priority: cookies first, then Authorization header
     let token = req.cookies?.token;
 
     if (!token && req.headers.authorization) {
@@ -13,37 +16,43 @@ const authMiddleware = async (req, res, next) => {
     }
 
     if (!token) {
-      console.log("❌ No token found in cookies or headers");
       return res.status(401).json({ error: "No token provided" });
     }
 
-    // Debug logging (REMOVE in production)
-    console.log(
-      "🔍 Verifying token with secret length:",
-      process.env.JWT_SECRET?.length
-    );
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Fetch fresh user data
-    const user = await User.findById(decoded.userId).select("-password");
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+    // Check cache first
+    const cachedAuth = authCache.get(token);
+    if (cachedAuth) {
+      req.user = cachedAuth;
+      return next();
     }
 
-    req.user = user;
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Get minimal user data
+    const user = await User.findById(decoded.userId)
+      .select("username plan status")
+      .lean();
+
+    if (!user || user.status !== "active") {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const userData = {
+      userId: user._id.toString(),
+      username: user.username,
+      plan: user.plan,
+    };
+
+    // Cache for faster subsequent requests
+    authCache.set(token, userData);
+    setTimeout(() => authCache.delete(token), AUTH_CACHE_TTL);
+
+    req.user = userData;
     next();
   } catch (err) {
-    console.error("🔒 Auth middleware error:", {
-      name: err.name,
-      message: err.message,
-      expired: err.name === "TokenExpiredError",
-    });
-
     if (err.name === "TokenExpiredError") {
-      return res
-        .status(401)
-        .json({ error: "Token expired, please login again" });
+      return res.status(401).json({ error: "Token expired" });
     }
     if (err.name === "JsonWebTokenError") {
       return res.status(401).json({ error: "Invalid token" });
@@ -51,5 +60,10 @@ const authMiddleware = async (req, res, next) => {
     res.status(401).json({ error: "Authentication failed" });
   }
 };
+
+// Clear expired cache entries periodically
+setInterval(() => {
+  authCache.clear();
+}, AUTH_CACHE_TTL);
 
 module.exports = authMiddleware;

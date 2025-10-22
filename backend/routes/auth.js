@@ -1,70 +1,69 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const authMiddleware = require("../middleware/auth"); // Add this
+const bcrypt = require("bcryptjs"); // ADD THIS LINE
+const authMiddleware = require("../middleware/auth");
 const User = require("../models/User");
 const Portfolio = require("../models/Portfolio");
 
-/* =============================
-   🧩 Helper: Token Generation
-============================= */
+// Cache for frequently accessed data
+const userCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 function generateToken(user) {
-  const token = jwt.sign(
+  return jwt.sign(
     {
       userId: user._id,
       username: user.username,
-      email: user.email,
     },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
-
-  // Debug: Confirm secret is loaded
-  if (process.env.NODE_ENV !== "production") {
-    console.log(
-      "🔑 Token generated with secret length:",
-      process.env.JWT_SECRET?.length
-    );
-  }
-
-  return token;
 }
 
-/* =============================
-   🧩 Register User
-============================= */
+// Clear cache periodically
+setInterval(() => {
+  userCache.clear();
+}, CACHE_TTL);
+
 router.post("/register", async (req, res) => {
   try {
     const { username, email, password, displayName } = req.body;
 
-    const existingUser = await User.findOne({
-      $or: [{ email }, { username }],
-    });
-
-    if (existingUser) {
-      return res.status(400).json({
-        error: "User with this email or username already exists",
-      });
+    // Quick validation
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: "All fields are required" });
     }
 
-    const user = new User({ username, email, password });
+    const existingUser = await User.findOne({
+      $or: [
+        { email: email.toLowerCase() },
+        { username: username.toLowerCase() },
+      ],
+    })
+      .select("_id")
+      .lean();
+
+    if (existingUser) {
+      return res.status(400).json({ error: "User already exists" });
+    }
+
+    const user = new User({
+      username: username.toLowerCase(),
+      email: email.toLowerCase(),
+      password,
+    });
     await user.save();
 
     const portfolio = new Portfolio({
-      username,
+      username: username.toLowerCase(),
       userId: user._id,
       displayName: displayName || username,
-      contacts: {},
-      skills: [],
-      projects: [],
-      testimonials: [],
     });
     await portfolio.save();
 
     const token = generateToken(user);
 
-    // Set secure cookie
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -72,9 +71,16 @@ router.post("/register", async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
+    // Cache user data
+    userCache.set(user._id.toString(), {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      plan: user.plan,
+    });
+
     res.status(201).json({
       message: "Registration successful",
-      token,
       user: {
         id: user._id,
         username: user.username,
@@ -88,29 +94,41 @@ router.post("/register", async (req, res) => {
   }
 });
 
-/* =============================
-   🧩 Login User
-============================= */
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password required" });
+    }
+
+    // Find user with only necessary fields
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select("username email password plan status lastLogin")
+      .lean();
+
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
+    // Verify password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    user.lastLogin = new Date();
-    await user.save();
+    if (user.status !== "active") {
+      return res.status(401).json({ error: "Account not active" });
+    }
 
     const token = generateToken(user);
 
-    // Set secure cookie
+    // Update last login without fetching full user
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { lastLogin: new Date() } }
+    );
+
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -118,15 +136,18 @@ router.post("/login", async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
+    // Cache user data
+    const userData = {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      plan: user.plan,
+    };
+    userCache.set(user._id.toString(), userData);
+
     res.json({
       message: "Login successful",
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        plan: user.plan,
-      },
+      user: userData,
     });
   } catch (err) {
     console.error("Login error:", err);
@@ -134,9 +155,6 @@ router.post("/login", async (req, res) => {
   }
 });
 
-/* =============================
-   🧩 Logout
-============================= */
 router.post("/logout", (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
@@ -146,28 +164,53 @@ router.post("/logout", (req, res) => {
   res.json({ message: "Logged out successfully" });
 });
 
-/* =============================
-   🧩 Get Current User (/me) - Now uses middleware
-============================= */
 router.get("/me", authMiddleware, async (req, res) => {
-  res.json({
-    user: req.user,
-    message: "User fetched successfully",
-  });
+  try {
+    // Try cache first
+    const cachedUser = userCache.get(req.user.userId);
+    if (cachedUser) {
+      return res.json({ user: cachedUser });
+    }
+
+    // If not cached, get fresh data with minimal fields
+    const user = await User.findById(req.user.userId)
+      .select("username email plan status customDomain createdAt")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const userData = {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      plan: user.plan,
+      status: user.status,
+      customDomain: user.customDomain,
+      createdAt: user.createdAt,
+    };
+
+    // Cache the result
+    userCache.set(req.user.userId, userData);
+
+    res.json({ user: userData });
+  } catch (err) {
+    console.error("Error fetching user:", err);
+    res.status(500).json({ error: "Error fetching user data" });
+  }
 });
 
-/* =============================
-   🧩 Forgot Password & Reset (unchanged)
-============================= */
+// Keep endpoints for password reset (unchanged)
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select("_id")
+      .lean();
 
     if (!user) {
-      return res.json({
-        message: "If the email exists, a reset link has been sent",
-      });
+      return res.json({ message: "If email exists, reset link sent" });
     }
 
     const resetToken = jwt.sign(
@@ -176,14 +219,7 @@ router.post("/forgot-password", async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-    console.log(`Password reset link for ${email}: ${resetLink}`);
-
-    res.json({
-      message: "Password reset link has been generated",
-      resetLink,
-      note: "In production, send via email service",
-    });
+    res.json({ message: "Password reset link generated", resetToken });
   } catch (err) {
     console.error("Forgot password error:", err);
     res.status(500).json({ error: "Error processing request" });
@@ -201,18 +237,19 @@ router.post("/reset-password", async (req, res) => {
 
     const user = await User.findById(decoded.userId);
     if (!user) {
-      return res.status(400).json({ error: "Invalid or expired reset token" });
+      return res.status(400).json({ error: "Invalid token" });
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.password = newPassword;
     await user.save();
 
-    res.json({
-      message: "Password reset successfully",
-    });
+    // Clear cache
+    userCache.delete(user._id.toString());
+
+    res.json({ message: "Password reset successfully" });
   } catch (err) {
     console.error("Reset password error:", err);
-    res.status(400).json({ error: "Invalid or expired reset token" });
+    res.status(400).json({ error: "Invalid or expired token" });
   }
 });
 
