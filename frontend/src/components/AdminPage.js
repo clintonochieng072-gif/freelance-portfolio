@@ -254,7 +254,6 @@ function AdminPage() {
       setError("");
 
       setProfilePictureUrl(data.portfolio.profilePicture || profilePictureUrl);
-      setResumeUrl(data.portfolio.resumeUrl || "");
       setProjects(data.portfolio.projects || projects);
       setContacts({ ...data.portfolio.contacts } || {});
       socketRef.current?.emit("portfolioUpdated", {
