@@ -3,38 +3,62 @@ const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const Portfolio = require("../models/Portfolio");
 const multer = require("multer");
-const path = require("path");
 const cloudinary = require("cloudinary").v2;
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "di4kkzjma",
-  api_key: process.env.CLOUDINARY_API_KEY || "181156621679153",
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// Configure Cloudinary with better error handling
+try {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  console.log("✅ Cloudinary configured successfully");
+} catch (error) {
+  console.error("❌ Cloudinary configuration failed:", error);
+}
 
 // Configure multer for temporary file storage
-const storage = multer.memoryStorage(); // Store files in memory temporarily
+const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 },
 }).fields([
   { name: "profilePicture", maxCount: 1 },
   { name: "resumeFile", maxCount: 1 },
 ]);
 
-// Upload to Cloudinary function
+// Enhanced upload function with better error handling
 const uploadToCloudinary = async (file, folder, resourceType = "image") => {
   return new Promise((resolve, reject) => {
+    // Validate Cloudinary configuration
+    if (!cloudinary.config().api_secret) {
+      return reject(new Error("Cloudinary API secret not configured"));
+    }
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: `portfolio_uploads/${folder}`,
         resource_type: resourceType,
-        upload_preset: "portfolio_uploads",
       },
       (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
+        if (error) {
+          console.error(`❌ Cloudinary upload error for ${folder}:`, error);
+          reject(
+            new Error(
+              `Failed to upload ${
+                folder === "resumes" ? "resume" : "profile picture"
+              }`
+            )
+          );
+        } else {
+          console.log(
+            `✅ ${
+              folder === "resumes" ? "Resume" : "Profile picture"
+            } uploaded:`,
+            result.secure_url
+          );
+          resolve(result);
+        }
       }
     );
 
@@ -165,7 +189,7 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
     if (isPublished !== undefined)
       portfolio.isPublished = isPublished === "true";
 
-    // Handle file uploads to Cloudinary
+    // Handle file uploads to Cloudinary with better error handling
     if (req.files?.profilePicture) {
       try {
         const result = await uploadToCloudinary(
@@ -174,17 +198,11 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
           "image"
         );
         portfolio.profilePicture = result.secure_url;
-        console.log(
-          `✅ Profile picture uploaded to Cloudinary: ${portfolio.profilePicture}`
-        );
       } catch (error) {
-        console.error(
-          "❌ Error uploading profile picture to Cloudinary:",
-          error
-        );
-        return res
-          .status(500)
-          .json({ error: "Failed to upload profile picture" });
+        console.error("❌ Profile picture upload failed:", error.message);
+        return res.status(500).json({
+          error: "Failed to upload profile picture: " + error.message,
+        });
       }
     }
 
@@ -193,13 +211,14 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
         const result = await uploadToCloudinary(
           req.files.resumeFile[0],
           "resumes",
-          "raw" // Use 'raw' for PDF files
+          "raw"
         );
         portfolio.resumeUrl = result.secure_url;
-        console.log(`✅ Resume uploaded to Cloudinary: ${portfolio.resumeUrl}`);
       } catch (error) {
-        console.error("❌ Error uploading resume to Cloudinary:", error);
-        return res.status(500).json({ error: "Failed to upload resume" });
+        console.error("❌ Resume upload failed:", error.message);
+        return res
+          .status(500)
+          .json({ error: "Failed to upload resume: " + error.message });
       }
     } else if (resumeUrl !== undefined) {
       portfolio.resumeUrl = resumeUrl || "";
@@ -226,6 +245,19 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
     console.error("Error updating portfolio:", err);
     res.status(500).json({ error: err.message || "Error updating portfolio" });
   }
+});
+
+// Add this test route to verify Cloudinary configuration
+router.get("/test-cloudinary-config", (req, res) => {
+  const config = cloudinary.config();
+  res.json({
+    cloud_name: config.cloud_name,
+    api_key: config.api_key ? "***" + config.api_key.slice(-4) : "missing",
+    api_secret: config.api_secret
+      ? "***" + config.api_secret.slice(-4)
+      : "missing",
+    configured: !!(config.cloud_name && config.api_key && config.api_secret),
+  });
 });
 
 module.exports = router;
