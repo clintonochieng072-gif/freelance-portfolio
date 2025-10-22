@@ -187,10 +187,50 @@ function AdminPage() {
   const handleDeleteResume = async () => {
     console.log("🗑️ Deleting resume");
     if (window.confirm("Are you sure you want to delete the resume?")) {
+      // Store current state before clearing
+      const currentContacts = contacts;
+      const currentSkills = skills.filter((s) => s?.trim());
+      const currentProjects = projects;
+      const currentTestimonials = testimonials;
+
+      // Clear both file and URL immediately
       setResumeFile(null);
       setResumeUrl("");
+
+      // Force a save with empty resume data using direct fetch
       try {
-        await savePortfolio();
+        const tempFormData = new FormData();
+        tempFormData.append("contacts", JSON.stringify(currentContacts));
+        tempFormData.append("skills", JSON.stringify(currentSkills));
+        tempFormData.append("projects", JSON.stringify(currentProjects));
+        tempFormData.append(
+          "testimonials",
+          JSON.stringify(currentTestimonials)
+        );
+        tempFormData.append("displayName", displayName || "");
+        tempFormData.append("title", title || "");
+        tempFormData.append("bio", bio || "");
+        tempFormData.append("theme", theme);
+        tempFormData.append("isPublished", isPublished);
+
+        // CRITICAL: Force empty resume URL
+        tempFormData.append("resumeUrl", "");
+
+        console.log("🗑️ Sending DELETE request with empty resumeUrl");
+
+        const res = await fetch(`${API_URL}/portfolio/update`, {
+          method: "PUT",
+          credentials: "include",
+          body: tempFormData,
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || `HTTP ${res.status}`);
+        }
+
+        // FIXED VERSION - remove the unused 'data' variable
+        await res.json(); // Just await the response without storing it
         console.log("✅ Resume deleted and portfolio saved");
       } catch (err) {
         console.error("❌ Error deleting resume:", err);
