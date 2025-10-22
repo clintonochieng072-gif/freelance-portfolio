@@ -2,10 +2,6 @@ import React from "react";
 import { FiTrash2 } from "react-icons/fi";
 import "./Admin.css";
 
-const BASE_URL =
-  process.env.REACT_APP_BASE_URL ||
-  "https://portfolio-backend-clinton.onrender.com";
-
 function ResumeSection({
   isAdmin,
   portfolio,
@@ -37,7 +33,7 @@ function ResumeSection({
         {resumeUrl && (
           <div style={{ marginTop: "10px" }}>
             <iframe
-              src={`${BASE_URL}${resumeUrl}`}
+              src={resumeUrl} // Now uses Cloudinary URL directly
               title="Resume Preview"
               width="100%"
               height="300px"
@@ -58,7 +54,7 @@ function ResumeSection({
               }}
             >
               <a
-                href={`${BASE_URL}${resumeUrl}`}
+                href={resumeUrl} // Now uses Cloudinary URL directly
                 target="_blank"
                 rel="noopener noreferrer"
                 download
@@ -86,7 +82,7 @@ function ResumeSection({
     <div className="resume-section">
       <h3>Resume</h3>
       <iframe
-        src={`${BASE_URL}${resumeUrl}`}
+        src={resumeUrl} // Now uses Cloudinary URL directly
         title="Resume Preview"
         width="100%"
         height="300px"
@@ -98,7 +94,7 @@ function ResumeSection({
       </p>
       <p>
         <a
-          href={`${BASE_URL}${resumeUrl}`}
+          href={resumeUrl} // Now uses Cloudinary URL directly
           target="_blank"
           rel="noopener noreferrer"
           download

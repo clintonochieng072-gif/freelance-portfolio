@@ -4,18 +4,17 @@ const authMiddleware = require("../middleware/auth");
 const Portfolio = require("../models/Portfolio");
 const multer = require("multer");
 const path = require("path");
+const cloudinary = require("cloudinary").v2;
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: "./Uploads/",
-  filename: (req, file, cb) => {
-    cb(
-      null,
-      `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`
-    );
-  },
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "di4kkzjma",
+  api_key: process.env.CLOUDINARY_API_KEY || "181156621679153",
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Configure multer for temporary file storage
+const storage = multer.memoryStorage(); // Store files in memory temporarily
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
@@ -23,6 +22,25 @@ const upload = multer({
   { name: "profilePicture", maxCount: 1 },
   { name: "resumeFile", maxCount: 1 },
 ]);
+
+// Upload to Cloudinary function
+const uploadToCloudinary = async (file, folder, resourceType = "image") => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: `portfolio_uploads/${folder}`,
+        resource_type: resourceType,
+        upload_preset: "portfolio_uploads",
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+
+    uploadStream.end(file.buffer);
+  });
+};
 
 // ROOT ROUTE - Get authenticated user's portfolio
 router.get("/", authMiddleware, async (req, res) => {
@@ -111,7 +129,7 @@ router.get("/me/portfolio", authMiddleware, async (req, res) => {
   }
 });
 
-// Update portfolio (Client's own portfolio only)
+// Update portfolio (Client's own portfolio only) - UPDATED FOR CLOUDINARY
 router.put("/update", authMiddleware, upload, async (req, res) => {
   try {
     const {
@@ -147,15 +165,42 @@ router.put("/update", authMiddleware, upload, async (req, res) => {
     if (isPublished !== undefined)
       portfolio.isPublished = isPublished === "true";
 
-    // Handle file uploads
+    // Handle file uploads to Cloudinary
     if (req.files?.profilePicture) {
-      portfolio.profilePicture = `/uploads/${req.files.profilePicture[0].filename}`;
+      try {
+        const result = await uploadToCloudinary(
+          req.files.profilePicture[0],
+          "profiles",
+          "image"
+        );
+        portfolio.profilePicture = result.secure_url;
+        console.log(
+          `✅ Profile picture uploaded to Cloudinary: ${portfolio.profilePicture}`
+        );
+      } catch (error) {
+        console.error(
+          "❌ Error uploading profile picture to Cloudinary:",
+          error
+        );
+        return res
+          .status(500)
+          .json({ error: "Failed to upload profile picture" });
+      }
     }
+
     if (req.files?.resumeFile) {
-      portfolio.resumeUrl = `/uploads/${req.files.resumeFile[0].filename}`;
-      console.log(
-        `📄 Resume uploaded: ${portfolio.resumeUrl}, MIME: ${req.files.resumeFile[0].mimetype}`
-      );
+      try {
+        const result = await uploadToCloudinary(
+          req.files.resumeFile[0],
+          "resumes",
+          "raw" // Use 'raw' for PDF files
+        );
+        portfolio.resumeUrl = result.secure_url;
+        console.log(`✅ Resume uploaded to Cloudinary: ${portfolio.resumeUrl}`);
+      } catch (error) {
+        console.error("❌ Error uploading resume to Cloudinary:", error);
+        return res.status(500).json({ error: "Failed to upload resume" });
+      }
     } else if (resumeUrl !== undefined) {
       portfolio.resumeUrl = resumeUrl || "";
       console.log(`📄 Resume URL updated: ${portfolio.resumeUrl}`);

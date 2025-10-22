@@ -1,9 +1,5 @@
 import React from "react";
 
-const BASE_URL =
-  process.env.REACT_APP_BASE_URL ||
-  "https://portfolio-backend-clinton.onrender.com";
-
 const ProfilePictureSection = ({ isAdmin, portfolio, onChange }) => {
   const handleFileChange = (e) => {
     if (isAdmin && onChange && e.target.files[0]) {
@@ -34,7 +30,7 @@ const ProfilePictureSection = ({ isAdmin, portfolio, onChange }) => {
           </button>
           {portfolio.profilePicture && (
             <img
-              src={`${BASE_URL}${portfolio.profilePicture}`}
+              src={portfolio.profilePicture} // Now uses Cloudinary URL directly
               alt="Profile Preview"
               className="profile-picture-preview"
               style={{
@@ -48,7 +44,7 @@ const ProfilePictureSection = ({ isAdmin, portfolio, onChange }) => {
         </div>
       ) : portfolio.profilePicture && portfolio.profilePicture.trim() !== "" ? (
         <img
-          src={`${BASE_URL}${portfolio.profilePicture}`}
+          src={portfolio.profilePicture} // Now uses Cloudinary URL directly
           alt="Profile"
           className="profile-picture"
           style={{
