@@ -104,7 +104,9 @@ router.post("/login", async (req, res) => {
 
     // Find user with only necessary fields
     const user = await User.findOne({ email: email.toLowerCase() })
-      .select("username email password plan status lastLogin")
+      .select(
+        "username email password plan status lastLogin has_paid is_first_login"
+      )
       .lean();
 
     if (!user) {
@@ -123,11 +125,19 @@ router.post("/login", async (req, res) => {
 
     const token = generateToken(user);
 
-    // Update last login without fetching full user
-    await User.updateOne(
-      { _id: user._id },
-      { $set: { lastLogin: new Date() } }
-    );
+    // Update last login and set is_first_login to false if it was true
+    const updateData = { lastLogin: new Date() };
+    if (user.is_first_login) {
+      updateData.is_first_login = false;
+    }
+
+    // Special unlock for admin account - automatically set has_paid = true
+    // This ensures the admin (Clinton) has full access without payment restrictions
+    if (user.email === "clintonochieng072@gmail.com") {
+      updateData.has_paid = true;
+    }
+
+    await User.updateOne({ _id: user._id }, { $set: updateData });
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -142,6 +152,8 @@ router.post("/login", async (req, res) => {
       username: user.username,
       email: user.email,
       plan: user.plan,
+      has_paid: user.has_paid,
+      is_first_login: user.is_first_login,
     };
     userCache.set(user._id.toString(), userData);
 
@@ -174,7 +186,9 @@ router.get("/me", authMiddleware, async (req, res) => {
 
     // If not cached, get fresh data with minimal fields
     const user = await User.findById(req.user.userId)
-      .select("username email plan status customDomain createdAt")
+      .select(
+        "username email plan status customDomain createdAt has_paid is_first_login"
+      )
       .lean();
 
     if (!user) {
@@ -189,6 +203,8 @@ router.get("/me", authMiddleware, async (req, res) => {
       status: user.status,
       customDomain: user.customDomain,
       createdAt: user.createdAt,
+      has_paid: user.has_paid,
+      is_first_login: user.is_first_login,
     };
 
     // Cache the result

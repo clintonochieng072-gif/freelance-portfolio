@@ -11,9 +11,7 @@ export const GlobalProvider = ({ children }) => {
 
   // ✅ FIXED: API_URL moved inside useEffect - ESLint compliant
   useEffect(() => {
-    const API_URL =
-      process.env.REACT_APP_API_URL ||
-      "https://portfolio-backend-clinton.onrender.com/api";
+    const API_URL = process.env.REACT_APP_API_URL;
 
     const checkAuthStatus = async () => {
       try {

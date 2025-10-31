@@ -102,6 +102,214 @@ textarea.editable-item {
 .resume-section {
   margin-bottom: 20px;
 }
+
+/* Payment Notice Styles */
+.payment-notice {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.payment-notice-content {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  max-width: 500px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.payment-notice h2 {
+  color: #dc3545;
+  margin-bottom: 15px;
+  font-size: 24px;
+}
+
+.payment-notice p {
+  margin-bottom: 20px;
+  line-height: 1.6;
+  color: #333;
+}
+
+.payment-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.payment-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 20px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+  min-width: 120px;
+}
+
+.payment-btn:hover {
+  background-color: #0056b3;
+  transform: translateY(-2px);
+}
+
+.payment-btn.call-admin {
+  background-color: #28a745;
+}
+
+.payment-btn.call-admin:hover {
+  background-color: #218838;
+}
+
+.payment-btn.message-admin {
+  background-color: #25d366;
+}
+
+.payment-btn.message-admin:hover {
+  background-color: #1da851;
+}
+
+/* Admin Mini Panel Styles */
+.admin-panel {
+  background: #f8f9fa;
+  border: 2px solid #007bff;
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 2px 10px rgba(0, 123, 255, 0.1);
+}
+
+.admin-panel h3 {
+  color: #007bff;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.admin-search {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.admin-search input {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.admin-search button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.admin-search button:hover {
+  background-color: #0056b3;
+}
+
+.user-card {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.user-card h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+}
+
+.user-card p {
+  margin: 5px 0;
+  color: #666;
+}
+
+.confirm-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 15px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.confirm-btn:hover {
+  background-color: #218838;
+}
+
+.confirm-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Trial Timer Styles */
+.trial-timer {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #856404;
+  font-weight: bold;
+}
+
+.trial-timer.warning {
+  background: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .admin-container {
+    padding: 10px;
+  }
+
+  .payment-notice-content {
+    padding: 20px;
+    margin: 20px;
+  }
+
+  .payment-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .payment-btn {
+    width: 100%;
+    max-width: 250px;
+  }
+
+  .admin-search {
+    flex-direction: column;
+  }
+
+  .admin-search input {
+    min-width: auto;
+  }
+}
 .admin-container {
   max-width: 800px;
   margin: 0 auto;

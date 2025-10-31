@@ -1,7 +1,5 @@
 // Create API client with credentials
-const API_URL =
-  process.env.REACT_APP_API_URL ||
-  "https://portfolio-backend-clinton.onrender.com/api";
+const API_URL = process.env.REACT_APP_API_URL;
 
 export const apiFetch = async (url, options = {}) => {
   const config = {

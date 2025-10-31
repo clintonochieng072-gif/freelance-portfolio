@@ -33,6 +33,14 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  has_paid: {
+    type: Boolean,
+    default: false,
+  },
+  is_first_login: {
+    type: Boolean,
+    default: true,
+  },
   subscriptionId: String,
   createdAt: {
     type: Date,

@@ -2,9 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useGlobalContext } from "../context/GlobalContext";
 
-const API_URL =
-  process.env.REACT_APP_API_URL ||
-  "https://portfolio-backend-clinton.onrender.com/api";
+const API_URL = process.env.REACT_APP_API_URL;
 
 function LoginPage() {
   const [email, setEmail] = useState("");
