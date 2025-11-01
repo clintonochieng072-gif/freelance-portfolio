@@ -58,7 +58,16 @@ function LoginPage() {
         return;
       } else {
         console.error("❌ Login failed:", data.error);
-        setMessage(`❌ ${data.error || "Invalid credentials"}`);
+        // Handle locked account error specifically
+        if (
+          response.status === 403 &&
+          data.error &&
+          data.error.includes("trial period has expired")
+        ) {
+          setMessage(`❌ ${data.error}`);
+        } else {
+          setMessage(`❌ ${data.error || "Invalid credentials"}`);
+        }
         localStorage.removeItem("user");
       }
     } catch (err) {

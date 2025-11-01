@@ -39,6 +39,79 @@ router.get("/dashboard", authMiddleware, async (req, res) => {
   }
 });
 
+// Search user by email (admin only)
+router.get("/search-user", authMiddleware, async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    // Check if current user is admin
+    const currentUser = await User.findById(req.user.userId);
+    if (currentUser.email !== "clintonochieng072@gmail.com") {
+      return res.status(403).json({ error: "Access denied. Admin only." });
+    }
+
+    if (!email) {
+      return res.status(400).json({ error: "Email parameter required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select("username email has_paid is_first_login createdAt")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        name: user.username,
+        email: user.email,
+        has_paid: user.has_paid,
+        is_first_login: user.is_first_login,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error("Search user error:", err);
+    res.status(500).json({ error: "Error searching user" });
+  }
+});
+
+// Confirm user payment (admin only)
+router.put("/confirm-payment/:userId", authMiddleware, async (req, res) => {
+  try {
+    // Check if current user is admin
+    const currentUser = await User.findById(req.user.userId);
+    if (currentUser.email !== "clintonochieng072@gmail.com") {
+      return res.status(403).json({ error: "Access denied. Admin only." });
+    }
+
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Update payment status and unlock account
+    await User.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          has_paid: true,
+          isLocked: false,
+        },
+      }
+    );
+
+    res.json({ message: "Payment confirmed successfully" });
+  } catch (err) {
+    console.error("Confirm payment error:", err);
+    res.status(500).json({ error: "Error confirming payment" });
+  }
+});
+
 // Update client profile
 router.put("/profile", authMiddleware, async (req, res) => {
   try {

@@ -1,53 +1,37 @@
-# Payment and Admin Confirmation Workflow Implementation
+# Update Subscription Fee and Add 30-Day Auto-Lock Feature
 
 ## Backend Changes
 
 - [x] Update User Model (`backend/models/User.js`):
 
-  - Add `has_paid: { type: Boolean, default: false }`
-  - Add `is_first_login: { type: Boolean, default: true }`
+  - Add `isLocked: Boolean` (default: false)
 
 - [x] Update Auth Routes (`backend/routes/auth.js`):
 
-  - On login, set `is_first_login = false` if it was true
-  - Include payment fields in user data responses
+  - Implement 30-day auto-lock logic on login
+  - Check if user hasn't paid and 30+ days since last login
+  - Set isLocked = true and logout user if expired
+  - Return appropriate error message for locked users
 
-- [x] Add Admin Backend Routes (`backend/routes/admin.js`):
-  - `GET /search-user?email=<email>`: Search user by email (admin only)
-  - `PUT /confirm-payment/:userId`: Update `has_paid = true` (admin only)
+- [x] Update Admin Routes (`backend/routes/admin.js`):
+  - When confirming payment, set isLocked = false automatically
 
 ## Frontend Changes
 
 - [x] Update AdminPage Component (`frontend/src/components/AdminPage.js`):
 
-  - Add trial editing logic with 30-second timer
-  - Add payment notice overlay when trial ends
-  - Add admin mini-panel for user search and confirmation
-  - Restrict features based on payment status
+  - Change all "700" references to "999"
+  - Update payment notice message to mention 999
+  - Update M-Pesa instructions to show 999 amount
+  - Update WhatsApp message to mention 999
 
-- [x] Update Admin CSS (`frontend/src/components/Admin.css`):
-  - Styles for payment notice modal
-  - Styles for admin mini-panel
-  - Mobile-responsive design
-
-## Environment Configuration
-
-- [x] Create `.env.development` for local development
-- [x] Create `.env.production` for production deployment
-- [x] Update all API URLs to use `process.env.REACT_APP_API_URL`
+- [x] Update LoginPage (`frontend/src/pages/LoginPage.js`):
+  - Handle locked user error message
+  - Show "trial expired" message for locked accounts
 
 ## Testing
 
-- [x] Test first-time login flow (is_first_login: true -> false)
-- [x] Test payment fields in responses
-- [x] Test admin search user endpoint
-- [x] Test admin confirm payment endpoint
-- [x] Backend server running on port 5000
-- [x] Frontend server running on port 3000
-- [x] Admin account auto-unlock (has_paid = true on login)
-- [x] Fixed M-Pesa "Pay Now" button instructions (Send Money vs Buy Goods)
-- [x] Fixed OK button behavior - now saves data immediately without requiring NEXT
-- [ ] Test 30-second editing trial (requires browser testing)
-- [ ] Test payment notice functionality (buttons, modal, WhatsApp, phone)
-- [ ] Test admin panel user search and confirmation (requires browser testing)
-- [ ] Verify mobile responsiveness (requires browser testing)
+- [ ] Test 30-day auto-lock functionality
+- [ ] Test payment confirmation unlocks account
+- [ ] Test updated 999 fee displays correctly
+- [ ] Test locked user login behavior

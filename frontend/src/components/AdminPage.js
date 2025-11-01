@@ -15,7 +15,7 @@ const PaymentNotice = ({ onClose }) => {
     // Fixed: Changed from "Buy Goods & Services" to "Send Money" instructions
     // This corrects the M-Pesa payment flow for sending money to a phone number
     alert(
-      `M-Pesa Payment Instructions:\n\n1. Open M-Pesa on your phone\n2. Tap "Send Money"\n3. Enter Payee Number: 254745408764\n4. Enter Amount: 700\n5. Enter your M-Pesa PIN and send\n\nAfter sending, contact the admin via WhatsApp or Call to confirm payment.`
+      `M-Pesa Payment Instructions:\n\n1. Open M-Pesa on your phone\n2. Tap "Send Money"\n3. Enter Payee Number: 254745408764\n4. Enter Amount: 999\n5. Enter your M-Pesa PIN and send\n\nAfter sending, contact the admin via WhatsApp or Call to confirm payment.`
     );
   };
 
@@ -36,10 +36,10 @@ const PaymentNotice = ({ onClose }) => {
         <h2>Editing Trial Ended</h2>
         <p>
           Your editing trial has ended. To unlock full editing access, please
-          pay a one-time subscription fee of <strong>KES 700</strong>.
+          pay a one-time subscription fee of <strong>KES 999</strong>.
         </p>
         <p>
-          Send KES 700 via M-Pesa to <strong>254745408764</strong>.
+          Send KES 999 via M-Pesa to <strong>254745408764</strong>.
         </p>
         <p>After payment, contact admin to activate your account manually.</p>
         <div className="payment-buttons">

@@ -41,6 +41,10 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  isLocked: {
+    type: Boolean,
+    default: false,
+  },
   subscriptionId: String,
   createdAt: {
     type: Date,

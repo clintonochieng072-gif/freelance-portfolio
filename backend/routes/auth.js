@@ -105,7 +105,7 @@ router.post("/login", async (req, res) => {
     // Find user with only necessary fields
     const user = await User.findOne({ email: email.toLowerCase() })
       .select(
-        "username email password plan status lastLogin has_paid is_first_login"
+        "username email password plan status lastLogin has_paid is_first_login isLocked"
       )
       .lean();
 
@@ -121,6 +121,33 @@ router.post("/login", async (req, res) => {
 
     if (user.status !== "active") {
       return res.status(401).json({ error: "Account not active" });
+    }
+
+    // Check if user is locked due to expired trial (30 days without payment)
+    if (user.isLocked) {
+      return res.status(403).json({
+        error:
+          "Your trial period has expired. Please unlock your account by sending 999 to 254745408764.",
+      });
+    }
+
+    // Check for 30-day auto-lock if user hasn't paid
+    if (!user.has_paid && user.lastLogin) {
+      const lastLoginDate = new Date(user.lastLogin);
+      const now = new Date();
+      const daysSinceLastLogin = Math.floor(
+        (now - lastLoginDate) / (1000 * 60 * 60 * 24)
+      );
+
+      if (daysSinceLastLogin >= 30) {
+        // Auto-lock the account
+        await User.updateOne({ _id: user._id }, { $set: { isLocked: true } });
+
+        return res.status(403).json({
+          error:
+            "Your trial period has expired. Please unlock your account by sending 999 to 254745408764.",
+        });
+      }
     }
 
     const token = generateToken(user);
@@ -154,6 +181,7 @@ router.post("/login", async (req, res) => {
       plan: user.plan,
       has_paid: user.has_paid,
       is_first_login: user.is_first_login,
+      isLocked: user.isLocked,
     };
     userCache.set(user._id.toString(), userData);
 
@@ -187,7 +215,7 @@ router.get("/me", authMiddleware, async (req, res) => {
     // If not cached, get fresh data with minimal fields
     const user = await User.findById(req.user.userId)
       .select(
-        "username email plan status customDomain createdAt has_paid is_first_login"
+        "username email plan status customDomain createdAt has_paid is_first_login isLocked"
       )
       .lean();
 
@@ -205,6 +233,7 @@ router.get("/me", authMiddleware, async (req, res) => {
       createdAt: user.createdAt,
       has_paid: user.has_paid,
       is_first_login: user.is_first_login,
+      isLocked: user.isLocked,
     };
 
     // Cache the result
